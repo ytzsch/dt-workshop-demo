@@ -273,6 +273,16 @@ function plaque(){
   let zz='M18 34 ';for(let i=0;i<10;i++)zz+=`L${24+i*10} ${i%2?34:18} `;
   return svgDoc(141,51,`<rect x="0.5" y="0.5" width="140" height="50" rx="6" fill="none" stroke="#ff0000" stroke-width="0.1"/><circle cx="8" cy="25.5" r="2" fill="none" stroke="#ff0000" stroke-width="0.1"/><circle cx="133" cy="25.5" r="2" fill="none" stroke="#ff0000" stroke-width="0.1"/><path d="${zz}" fill="none" stroke="#0000ff" stroke-width="0.1"/><rect x="118" y="16" width="8" height="8" fill="#000000" stroke="none"/><rect x="118" y="28" width="8" height="8" fill="#000000" stroke="none"/>`);
 }
+function keyringDXF(w,h){
+  const r=h/2-2,b=Math.tan(Math.PI/8);
+  const v=[[r,0,0],[w-r,0,b],[w,r,0],[w,h-r,b],[w-r,h,0],[r,h,b],[0,h-r,0],[0,r,b]];
+  const lw=(layer,pts,col)=>['0','LWPOLYLINE','8',layer,...(col?['62',col]:[]),'90',pts.length,'70','1',...pts.flatMap(([x,y,bb])=>['10',x.toFixed(3),'20',y.toFixed(3),...(bb?['42',bb.toFixed(6)]:[])])];
+  const st=[];for(let i=0;i<10;i++){const rr=i%2?3.6:8,a=Math.PI/2+i*Math.PI/5;st.push([w*0.62+rr*Math.cos(a),h/2+rr*Math.sin(a),0])}
+  const out=['0','SECTION','2','HEADER','9','$ACADVER','1','AC1015','9','$INSUNITS','70','4','0','ENDSEC',
+    '0','SECTION','2','TABLES','0','TABLE','2','LAYER','0','LAYER','2','CUT','70','0','62','1','6','CONTINUOUS','0','LAYER','2','ENGRAVE','70','0','62','5','6','CONTINUOUS','0','ENDTAB','0','ENDSEC',
+    '0','SECTION','2','ENTITIES',...lw('CUT',v),'0','CIRCLE','8','CUT','10',(h/2.4).toFixed(3),'20',(h/2).toFixed(3),'40','2.6',...lw('ENGRAVE',st),'0','ENDSEC','0','EOF'];
+  return out.join('\n');
+}
 /* a file with the usual mistakes: no mm units, text left as text, nearly-red line, open cut line, a duplicate */
 function problemFile(){
   return `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="110" viewBox="0 0 240 110">
@@ -352,8 +362,9 @@ function isClosed(el,live,s){
   if(t==='path')return pathClosed(el,live,s);
   return true;
 }
-function analyseSVG(text,matId){
+function analyseSVG(text,matId,opts={}){
   const checks=[];const add=(level,t)=>checks.push({level,text:t});
+  const nm=c=>(opts.names&&opts.names[c])||c.toUpperCase();
   const mat=MATERIALS[matId]||MATERIALS.ply3;
   let doc=null;try{doc=new DOMParser().parseFromString(text,'image/svg+xml')}catch(e){}
   if(!doc||doc.querySelector('parsererror')||doc.documentElement.nodeName.toLowerCase()!=='svg'){
@@ -414,8 +425,8 @@ function analyseSVG(text,matId){
   const fits=bw<=inner.w&&bh<=inner.h, fitsRot=bh<=inner.w&&bw<=inner.h;
   if(fits||fitsRot) add('pass',`Fits the laser bed and a ${mat.w} × ${mat.h} mm sheet: your design is ${mm(bw)} × ${mm(bh)} mm.`);
   else add('fail',`Too big for the laser: your design is ${mm(bw)} × ${mm(bh)} mm, and the most it can cut is ${inner.w} × ${inner.h} mm. Make it smaller or split it into parts.`);
-  if(near.size) add('fail',`Some lines are nearly red (${[...near].map(c=>c.toUpperCase()).join(', ')}) but not pure red, so the laser won't cut them. Change them to red, #FF0000.`);
-  if(other.size) add('fail',`Lines in ${[...other].map(c=>c.toUpperCase()).join(', ')} don't mean anything to this laser. Use red to cut, blue to score lines, or black to engrave.`);
+  if(near.size) add('fail',`Some lines are nearly red (${[...near].map(nm).join(', ')}) but not pure red, so the laser won't cut them. Change them to red, #FF0000.`);
+  if(other.size) add('fail',`Lines in ${[...other].map(nm).join(', ')} don't mean anything to this laser. Use red to cut, blue to score lines, or black to engrave.`);
   if(!near.size&&!other.size) add('pass','Line colours match the laser: red cuts, blue scores, black engraves.');
   if(texts) add('fail',`${texts} piece${texts>1?'s':''} of text ${texts>1?'are':'is'} still text. Convert text to outlines (paths) first, or the laser may swap your font.`);
   else add('pass','No text left as text.');
@@ -430,6 +441,162 @@ function analyseSVG(text,matId){
   const est=30+cut.len/mat.speed+score/60+raster/22+cut.n*1.5;
   add('info',`Estimated laser time in ${mat.t} mm ${mat.name.toLowerCase()}: about ${fmtDur(est)} per copy.`);
   return {checks,est,art:{markup:live.innerHTML,s,vbx:vb[0],vby:vb[1],bx,by,bw,bh}};
+}
+
+/* ---------- DXF import: converted to an SVG in mm, then checked like any SVG ---------- */
+const ACI_HEX={1:'#ff0000',2:'#ffff00',3:'#00ff00',4:'#00ffff',5:'#0000ff',6:'#ff00ff',7:'#000000',8:'#808080',9:'#c0c0c0'};
+const ACI_NAME={1:'red',2:'yellow',3:'green',4:'cyan',5:'blue',6:'magenta',7:'black/white',8:'dark grey',9:'light grey'};
+function aciHex(n){return ACI_HEX[n]||('#1'+(0x10000+n).toString(16).slice(-5))}
+function dxfToSVG(text){
+  const lines=text.split(/\r\n|\r|\n/);const pairs=[];
+  for(let i=0;i+1<lines.length;i+=2){const c=parseInt(lines[i].trim(),10);if(isNaN(c)){if(!lines[i].trim())continue;return {error:true}}pairs.push([c,lines[i+1].trim()])}
+  if(!pairs.some(p=>p[0]===0&&p[1]==='SECTION'))return {error:true};
+  const recs=[];let cur=null;
+  for(const [c,v] of pairs){if(c===0){cur={type:v,g:[]};recs.push(cur)}else if(cur)cur.g.push([c,v])}
+  const get=(r,c,d)=>{const p=r.g.find(x=>x[0]===c);return p?p[1]:d};
+  const num=(r,c,d=0)=>{const v=get(r,c);return v==null||v===''?d:parseFloat(v)};
+  let units=null;const layers={},blocks={},ents=[];let sec=null,blk=null;
+  const collect=(i,arr)=>{const r=recs[i];
+    if(r.type==='POLYLINE'){const verts=[];let j=i+1;while(j<recs.length&&recs[j].type==='VERTEX'){verts.push(recs[j]);j++}
+      r.verts=verts;arr.push(r);return recs[j]&&recs[j].type==='SEQEND'?j:j-1}
+    arr.push(r);return i};
+  for(let i=0;i<recs.length;i++){const r=recs[i];
+    if(r.type==='SECTION'){sec=get(r,2);
+      if(sec==='HEADER'){const k=r.g.findIndex(p=>p[0]===9&&p[1]==='$INSUNITS');if(k>=0&&r.g[k+1])units=parseInt(r.g[k+1][1],10)}
+      continue}
+    if(r.type==='ENDSEC'){sec=null;continue}
+    if(sec==='TABLES'&&r.type==='LAYER'){layers[get(r,2,'0')]={c:parseInt(get(r,62,'7'),10),tc:get(r,420)};continue}
+    if(sec==='BLOCKS'){
+      if(r.type==='BLOCK'){blk={name:get(r,2),bx:num(r,10),by:num(r,20),ents:[]};blocks[blk.name]=blk;continue}
+      if(r.type==='ENDBLK'){blk=null;continue}
+      if(blk){i=collect(i,blk.ents);continue}
+    }
+    if(sec==='ENTITIES')i=collect(i,ents);
+  }
+  const notes={spline:0,ignored:new Set(),nonuniform:0,threeD:0,hidden:0};
+  const used=new Map(); // hex -> aci label
+  const prims=[];
+  const tcHex=v=>'#'+(parseInt(v,10)&0xffffff).toString(16).padStart(6,'0');
+  function colourOf(r,inherit){
+    const tc=get(r,420);if(tc)return {hex:tcHex(tc),label:'a custom colour'};
+    let c=get(r,62);c=c==null?256:parseInt(c,10);
+    if(c===0)return inherit||{hex:'#000000',aci:7};
+    if(c===256){const L=layers[get(r,8,'0')];if(L){if(L.c<0)return null;if(L.tc)return {hex:tcHex(L.tc),label:'a custom colour'};c=L.c}else c=7}
+    if(c<0)return null;
+    return {hex:aciHex(c),aci:c};
+  }
+  const mul=(A,B)=>[A[0]*B[0]+A[2]*B[1],A[1]*B[0]+A[3]*B[1],A[0]*B[2]+A[2]*B[3],A[1]*B[2]+A[3]*B[3],A[0]*B[4]+A[2]*B[5]+A[4],A[1]*B[4]+A[3]*B[5]+A[5]];
+  const tp=(M,x,y)=>[M[0]*x+M[2]*y+M[4],M[1]*x+M[3]*y+M[5]];
+  function polyPrim(M,pts,closed,col){
+    const det=M[0]*M[3]-M[1]*M[2];
+    prims.push({k:'poly',pts:pts.map(([x,y,b])=>{const [X,Y]=tp(M,x,y);return [X,Y,(b||0)*Math.sign(det||1)]}),closed,col});
+  }
+  function bspline(ctrl,deg,knots,n){
+    const m=ctrl.length;if(m<=deg||knots.length!==m+deg+1)return ctrl;
+    const out=[],t0=knots[deg],t1=knots[m];
+    for(let s=0;s<=n;s++){const t=t0+(t1-t0)*s/n;let k=deg;while(k<m-1&&t>=knots[k+1])k++;
+      const d=[];for(let j=0;j<=deg;j++)d.push([...ctrl[k-deg+j]]);
+      for(let r=1;r<=deg;r++)for(let j=deg;j>=r;j--){const i=k-deg+j;const den=knots[i+deg-r+1]-knots[i];const a=den?(t-knots[i])/den:0;
+        d[j]=[(1-a)*d[j-1][0]+a*d[j][0],(1-a)*d[j-1][1]+a*d[j][1]]}
+      out.push(d[deg])}
+    return out;
+  }
+  function catmull(P,n){if(P.length<3)return P;const out=[];
+    for(let i=0;i<P.length-1;i++){const p0=P[Math.max(0,i-1)],p1=P[i],p2=P[i+1],p3=P[Math.min(P.length-1,i+2)];
+      for(let k=0;k<n;k++){const t=k/n,t2=t*t,t3=t2*t;out.push([0,1].map(a=>0.5*(2*p1[a]+(-p0[a]+p2[a])*t+(2*p0[a]-5*p1[a]+4*p2[a]-p3[a])*t2+(-p0[a]+3*p1[a]-3*p2[a]+p3[a])*t3)))}}
+    out.push(P[P.length-1]);return out}
+  function emit(list,M,inherit,depth){
+    for(const r of list){
+      const col=colourOf(r,inherit);
+      if(!col){notes.hidden++;continue}
+      const t=r.type;
+      if(t==='LINE')polyPrim(M,[[num(r,10),num(r,20)],[num(r,11),num(r,21)]],false,col);
+      else if(t==='LWPOLYLINE'){const pts=[];for(const [c,v] of r.g){if(c===10)pts.push([parseFloat(v),0,0]);else if(c===20&&pts.length)pts[pts.length-1][1]=parseFloat(v);else if(c===42&&pts.length)pts[pts.length-1][2]=parseFloat(v)}
+        if(pts.length>1)polyPrim(M,pts,(num(r,70)&1)===1,col)}
+      else if(t==='POLYLINE'){const f=num(r,70);if(f&(16|64)){notes.threeD++;continue}
+        const pts=r.verts.filter(v=>!(num(v,70)&16)).map(v=>[num(v,10),num(v,20),num(v,42)]);if(pts.length>1)polyPrim(M,pts,(f&1)===1,col)}
+      else if(t==='CIRCLE'){const det=M[0]*M[3]-M[1]*M[2];const [X,Y]=tp(M,num(r,10),num(r,20));prims.push({k:'circle',cx:X,cy:Y,r:num(r,40)*Math.sqrt(Math.abs(det)),col})}
+      else if(t==='ARC'){const cx=num(r,10),cy=num(r,20),R=num(r,40),s=num(r,50)*Math.PI/180,e=num(r,51)*Math.PI/180;
+        let th=e-s;while(th<=0)th+=2*Math.PI;
+        if(th>=2*Math.PI-1e-9){const det=M[0]*M[3]-M[1]*M[2];const [X,Y]=tp(M,cx,cy);prims.push({k:'circle',cx:X,cy:Y,r:R*Math.sqrt(Math.abs(det)),col});continue}
+        polyPrim(M,[[cx+R*Math.cos(s),cy+R*Math.sin(s),Math.tan(th/4)],[cx+R*Math.cos(e),cy+R*Math.sin(e),0]],false,col)}
+      else if(t==='ELLIPSE'){const cx=num(r,10),cy=num(r,20),mx=num(r,11),my=num(r,21),ra=num(r,40,1);let s=num(r,41,0),e=num(r,42,2*Math.PI);
+        while(e<=s)e+=2*Math.PI;const full=e-s>=2*Math.PI-1e-6,n=Math.max(16,Math.ceil((e-s)/(2*Math.PI)*96));const pts=[];
+        for(let i=0;i<=(full?n-1:n);i++){const a=s+(e-s)*i/n;pts.push([cx+Math.cos(a)*mx-Math.sin(a)*my*ra,cy+Math.cos(a)*my+Math.sin(a)*mx*ra,0])}
+        polyPrim(M,pts,full,col)}
+      else if(t==='SPLINE'){notes.spline++;const fit=[],ctrl=[],knots=[];
+        for(const [c,v] of r.g){if(c===10)ctrl.push([parseFloat(v),0]);else if(c===20&&ctrl.length)ctrl[ctrl.length-1][1]=parseFloat(v);
+          else if(c===11)fit.push([parseFloat(v),0]);else if(c===21&&fit.length)fit[fit.length-1][1]=parseFloat(v);else if(c===40)knots.push(parseFloat(v))}
+        const deg=num(r,71,3);const pts=ctrl.length>deg?bspline(ctrl,deg,knots,Math.max(24,ctrl.length*12)):catmull(fit,10);
+        if(pts.length>1)polyPrim(M,pts.map(p=>[p[0],p[1],0]),(num(r,70)&1)===1,col)}
+      else if(t==='TEXT'||t==='MTEXT'){const [X,Y]=tp(M,num(r,10),num(r,20));const s=Math.sqrt(Math.abs(M[0]*M[3]-M[1]*M[2]));
+        const str=(r.g.filter(p=>p[0]===3).map(p=>p[1]).join('')+get(r,1,'')).replace(/\\P/g,' ').replace(/\\[A-Za-z][^;]*;|[{}]/g,'');
+        prims.push({k:'text',x:X,y:Y,h:num(r,40,2.5)*s,str,col})}
+      else if(t==='INSERT'){const b=blocks[get(r,2)];if(!b||depth>8)continue;
+        const sx=num(r,41,1),sy=num(r,42,1),rot=num(r,50,0)*Math.PI/180;if(Math.abs(Math.abs(sx)-Math.abs(sy))>1e-6)notes.nonuniform++;
+        const T=[Math.cos(rot)*sx,Math.sin(rot)*sx,-Math.sin(rot)*sy,Math.cos(rot)*sy,num(r,10),num(r,20)];
+        const B=[1,0,0,1,-b.bx,-b.by];emit(b.ents,mul(M,mul(T,B)),col,depth+1)}
+      else if(!['POINT','VIEWPORT','ATTDEF','ATTRIB','SEQEND','VERTEX'].includes(t))notes.ignored.add(t);
+    }
+  }
+  emit(ents,[1,0,0,1,0,0],null,0);
+  if(!prims.length)return {empty:true,notes};
+  const f={1:25.4,2:304.8,4:1,5:10,6:1000}[units]||1;
+  // join separate lines and arcs that touch end to end into one outline, as CAD programs often save outlines in pieces
+  const tol=0.02/f,same=(a,b)=>Math.abs(a[0]-b[0])<tol&&Math.abs(a[1]-b[1])<tol;
+  const rev=pts=>{const n=pts.length-1;return pts.map((_,k)=>[pts[n-k][0],pts[n-k][1],k<n?-(pts[n-k-1][2]||0):0])};
+  const opens=prims.filter(p=>p.k==='poly'&&!p.closed);let joined=0;
+  const pool=new Set(opens);
+  for(const start of opens){
+    if(!pool.has(start))continue;pool.delete(start);
+    let pts=start.pts.map(q=>[...q]);pts[pts.length-1][2]=0;let grew=false;
+    for(let pass=0;pass<2;pass++){
+      let found=true;
+      while(found&&!same(pts[0],pts[pts.length-1])){found=false;
+        for(const o of pool){if(o.col.hex!==start.col.hex)continue;
+          let op=null;if(same(o.pts[0],pts[pts.length-1]))op=o.pts;else if(same(o.pts[o.pts.length-1],pts[pts.length-1]))op=rev(o.pts);
+          if(op){pts[pts.length-1][2]=op[0][2]||0;pts=pts.concat(op.slice(1).map(q=>[...q]));pts[pts.length-1][2]=0;pool.delete(o);prims.splice(prims.indexOf(o),1);found=true;grew=true;joined++;break}}
+      }
+      if(same(pts[0],pts[pts.length-1]))break;
+      pts=rev(pts);
+    }
+    if(pts.length>2&&same(pts[0],pts[pts.length-1])){pts.pop();start.closed=true}
+    if(grew||start.closed)start.pts=pts;
+  }
+  // arc helper in drawing units
+  function arcInfo(p,q,b){const th=4*Math.atan(b),dx=q[0]-p[0],dy=q[1]-p[1],d=Math.hypot(dx,dy)||1e-9;
+    const h=d/2/Math.tan(th/2),cx=(p[0]+q[0])/2-dy/d*h,cy=(p[1]+q[1])/2+dx/d*h;return {th,cx,cy,r:Math.hypot(p[0]-cx,p[1]-cy),a0:Math.atan2(p[1]-cy,p[0]-cx)}}
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;const ext=(x,y)=>{x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y)};
+  for(const p of prims){
+    if(p.k==='circle'){ext(p.cx-p.r,p.cy-p.r);ext(p.cx+p.r,p.cy+p.r)}
+    else if(p.k==='text'){ext(p.x,p.y);ext(p.x+p.h*0.6*p.str.length,p.y+p.h)}
+    else{const n=p.pts.length;for(let i=0;i<n;i++){const a=p.pts[i];ext(a[0],a[1]);
+      if(a[2]&&(i<n-1||p.closed)){const q=p.pts[(i+1)%n];const A=arcInfo(a,q,a[2]);for(let s=1;s<16;s++){const t=A.a0+A.th*s/16;ext(A.cx+A.r*Math.cos(t),A.cy+A.r*Math.sin(t))}}}}
+  }
+  const pad=0.5,W=(x1-x0)*f+2*pad,H=(y1-y0)*f+2*pad;
+  const X=x=>((x-x0)*f+pad).toFixed(3),Y=y=>((y1-y)*f+pad).toFixed(3);
+  const names={};const note=c=>{if(c.aci!=null){names[c.hex]=`DXF colour ${c.aci} (${ACI_NAME[c.aci]||'colour '+c.aci})`;used.set(c.aci,(used.get(c.aci)||0)+1)}};
+  const body=prims.map(p=>{note(p.col);const st=`fill="none" stroke="${p.col.hex}" stroke-width="0.1"`;
+    if(p.k==='circle')return `<circle cx="${X(p.cx)}" cy="${Y(p.cy)}" r="${(p.r*f).toFixed(3)}" ${st}/>`;
+    if(p.k==='text')return `<text x="${X(p.x)}" y="${Y(p.y)}" font-size="${(p.h*f).toFixed(2)}" fill="${p.col.hex}">${esc(p.str)}</text>`;
+    const n=p.pts.length;let d=`M${X(p.pts[0][0])} ${Y(p.pts[0][1])}`;
+    for(let i=0;i<(p.closed?n:n-1);i++){const a=p.pts[i],q=p.pts[(i+1)%n];
+      if(a[2]){const A=arcInfo(a,q,a[2]);d+=` A${(A.r*f).toFixed(3)} ${(A.r*f).toFixed(3)} 0 ${Math.abs(A.th)>Math.PI?1:0} ${a[2]>0?0:1} ${X(q[0])} ${Y(q[1])}`}
+      else d+=` L${X(q[0])} ${Y(q[1])}`}
+    return `<path d="${d}${p.closed?' Z':''}" ${st}/>`;
+  }).join('');
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${W.toFixed(3)}mm" height="${H.toFixed(3)}mm" viewBox="0 0 ${W.toFixed(3)} ${H.toFixed(3)}">${body}</svg>`;
+  const pre=[];
+  const unitName={1:'inches',2:'feet',4:'millimetres',5:'centimetres',6:'metres'}[units];
+  const joinTxt=joined?' Joined separate lines and arcs that meet into outlines.':'';
+  if(unitName)pre.push({level:'pass',text:`Read the DXF: ${prims.length} ${plural(prims.length,'shape')}, drawn in ${unitName}.${joinTxt}`});
+  else pre.push({level:'warn',text:`Read the DXF: ${prims.length} ${plural(prims.length,'shape')}.${joinTxt} The file doesn't say what units it uses, so it's been read as millimetres. Check it measures what you expect.`});
+  if(used.size)pre.push({level:'info',text:'Colours in the drawing: '+[...used.entries()].map(([a,n])=>`${ACI_NAME[a]||'colour '+a} (${n})`).join(', ')+'. Red cuts, blue scores, black engraves.'});
+  if(notes.spline)pre.push({level:'warn',text:`${notes.spline} smooth ${plural(notes.spline,'curve')} (${plural(notes.spline,'spline')}) turned into short straight segments. Check the preview looks right.`});
+  if(notes.ignored.size)pre.push({level:'warn',text:`Some things in the file aren't shown or checked: ${[...notes.ignored].map(s=>s.toLowerCase()).join(', ')}. Hatched or filled areas need checking by the technician.`});
+  if(notes.threeD)pre.push({level:'warn',text:`${notes.threeD} 3D ${plural(notes.threeD,'shape was','shapes were')} left out. Export a flat 2D drawing.`});
+  if(notes.nonuniform)pre.push({level:'warn',text:'Some blocks are stretched more one way than the other, so circles in them may not come out right.'});
+  return {svg,names,pre};
 }
 
 /* ---------- STL checks ---------- */
@@ -643,7 +810,7 @@ function renderPupil(){
   const fails=res?res.checks.filter(c=>c.level==='fail').length:0;
   const indOk=!!state.ind[p.id][proj.kind==='print'?'printer':'laser'];
   const samples=proj.kind==='laser'
-    ?`<button type="button" class="btn sm" data-act="sample" data-s="good">Use the sample keyring</button><button type="button" class="btn sm" data-act="sample" data-s="bad">Try a file with mistakes</button>`
+    ?`<button type="button" class="btn sm" data-act="sample" data-s="good">Use the sample keyring</button><button type="button" class="btn sm" data-act="sample" data-s="dxf">Use a sample DXF</button><button type="button" class="btn sm" data-act="sample" data-s="bad">Try a file with mistakes</button>`
     :`<button type="button" class="btn sm" data-act="sample" data-s="clip">Use the sample cable clip</button><button type="button" class="btn sm" data-act="sample" data-s="big">Try a model that's too big</button>`;
   const returning=state.returning?state.jobs.find(j=>j.id===state.returning):null;
   return `
@@ -660,10 +827,10 @@ function renderPupil(){
             :`<div class="field"><label>Printer</label><div style="padding:6px 0">Prusa MK3, PLA</div></div>`}
           <div class="field"><label for="f-qty">Copies</label><input id="f-qty" type="number" min="1" max="30" value="${d.qty}" data-chg="qty"></div>
         </div>
-        <p class="small muted">Due ${esc(fmtDate(daysAhead(proj.due)))}. ${proj.kind==='laser'?'Draw in mm. Red lines cut, blue lines score, black engraves.':'Export as STL in millimetres.'}</p>
+        <p class="small muted">Due ${esc(fmtDate(daysAhead(proj.due)))}. ${proj.kind==='laser'?'Send an SVG or DXF drawn in mm. Red lines cut, blue lines score, black engraves.':'Export as STL in millimetres.'}</p>
         <div class="drop" id="drop">
-          <label class="btn primary" for="f-file">Choose your ${proj.kind==='laser'?'.svg':'.stl'} file</label>
-          <input id="f-file" type="file" accept="${proj.kind==='laser'?'.svg,image/svg+xml':'.stl'}" data-chg="file" style="position:absolute;width:1px;height:1px;opacity:0">
+          <label class="btn primary" for="f-file">Choose your ${proj.kind==='laser'?'.svg or .dxf':'.stl'} file</label>
+          <input id="f-file" type="file" accept="${proj.kind==='laser'?'.svg,.dxf,image/svg+xml':'.stl'}" data-chg="file" style="position:absolute;width:1px;height:1px;opacity:0">
           <span class="small muted">or drop it here, or</span>
           <div class="row" style="justify-content:center">${samples}</div>
         </div>
@@ -696,12 +863,17 @@ function pupilJob(j){
     ${j.status==='cut'||j.status==='printed'?`<div class="small" style="color:var(--ok)">Pick it up from the D&amp;T prep room.</div>`:''}
   </div></article>`;
 }
-function clearDraftFile(){const d=state.draft;delete d.result;delete d.file;delete d.text;delete d.mesh}
-function loadDraftSVG(text,name){const d=state.draft;d.text=text;d.file=name;d.result=analyseSVG(text,d.mat);render()}
+function clearDraftFile(){const d=state.draft;delete d.result;delete d.file;delete d.text;delete d.mesh;delete d.names;delete d.pre}
+function analyseDraft(){const d=state.draft;const r=analyseSVG(d.text,d.mat,{names:d.names});if(d.pre)r.checks=[...d.pre,...r.checks];d.result=r}
+function loadDraftSVG(text,name){const d=state.draft;d.text=text;d.file=name;delete d.names;delete d.pre;analyseDraft();render()}
+function loadDraftDXF(text,name){const d=state.draft;d.file=name;const r=dxfToSVG(text);
+  if(r.error||r.empty){delete d.text;d.result={fatal:true,checks:[{level:'fail',text:r.error?"This file couldn't be read as a DXF. Save it again as DXF (AutoCAD 2000 or later works best) and try once more.":"The DXF has no 2D shapes in it that the laser can use. Check you exported the right drawing."}]};render();return}
+  d.text=r.svg;d.names=r.names;d.pre=r.pre;analyseDraft();render()}
 function loadDraftSTL(buf,name){const d=state.draft;d.file=name;const t=readSTL(buf);d.mesh=t;d.result=analyseSTL(t);render()}
 function handleFile(f){
   if(!f)return;const kind=PROJ[state.draft.project].kind;
-  if(kind==='laser'){if(!/\.svg$/i.test(f.name)){toast('Choose an .svg file for laser jobs.');return}f.text().then(t=>loadDraftSVG(t,f.name))}
+  if(kind==='laser'){if(/\.dxf$/i.test(f.name)){f.text().then(t=>loadDraftDXF(t,f.name));return}
+    if(!/\.svg$/i.test(f.name)){toast('Choose an .svg or .dxf file for laser jobs.');return}f.text().then(t=>loadDraftSVG(t,f.name))}
   else{if(!/\.stl$/i.test(f.name)){toast('Choose an .stl file for 3D printing.');return}f.arrayBuffer().then(b=>loadDraftSTL(b,f.name))}
 }
 function submitDraft(){
@@ -916,6 +1088,7 @@ const ACT={
   sample:b=>{const s=b.dataset.s;
     if(s==='good')loadDraftSVG(keyring(56,26,'star'),'finn-keyring.svg');
     if(s==='bad')loadDraftSVG(problemFile(),'finn keyring FINAL(2).svg');
+    if(s==='dxf')loadDraftDXF(keyringDXF(56,26),'finn-keyring.dxf');
     if(s==='clip')loadDraftSTL(makeBinarySTL(MESH.clip()),'cable-clip.stl');
     if(s==='big')loadDraftSTL(makeBinarySTL(MESH.big()),'desk-tidy-full-size.stl');},
   submit:()=>submitDraft(),
@@ -950,7 +1123,7 @@ const ACT={
 };
 const CHG={
   project:v=>{state.draft.project=v;const p=PROJ[v];state.draft.mat=p.mat||'pla';clearDraftFile()},
-  mat:v=>{state.draft.mat=v;if(state.draft.text)state.draft.result=analyseSVG(state.draft.text,v)},
+  mat:v=>{state.draft.mat=v;if(state.draft.text)analyseDraft()},
   qty:v=>{state.draft.qty=Math.max(1,Math.min(30,+v||1))},
   classFilter:v=>{state.classFilter=v},progressProject:v=>{state.progressProject=v},evidencePupil:v=>{state.evidencePupil=v},safetyClass:v=>{state.safetyClass=v},
   pupil:v=>{state.pupil=v;state.returning=null;clearDraftFile()}
