@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D&amp;T Workshop Manager Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Workshop job sheet: steel-grey paper, teal accent; red and blue are kept for laser line meaning only */
+  --bg:#eceeea; --panel:#ffffff; --panel-2:#f5f6f3; --ink:#1b2226; --muted:#5a656c; --line:#d5dad5;
+  --accent:#0d6b63; --accent-ink:#ffffff; --accent-soft:#dcefeb;
+  --ok:#2c7536; --ok-soft:#e0f0e2; --warn:#8f5400; --warn-soft:#fbeed6; --bad:#b0302a; --bad-soft:#f8e0dd;
+  --info:#38566b; --info-soft:#e3ebf1;
+  --f-display:'Barlow Condensed','Arial Narrow',sans-serif;
+  --f-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#13181b; --panel:#1b2226; --panel-2:#212a2e; --ink:#e4e9e6; --muted:#9aa6ab; --line:#313b40;
+    --accent:#52b8ab; --accent-ink:#0c1b19; --accent-soft:#1d3835;
+    --ok:#73c27f; --ok-soft:#1d3222; --warn:#e3a84f; --warn-soft:#3a2d16; --bad:#ef7d72; --bad-soft:#3c211f;
+    --info:#9cc0d8; --info-soft:#1f2d37; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#13181b; --panel:#1b2226; --panel-2:#212a2e; --ink:#e4e9e6; --muted:#9aa6ab; --line:#313b40;
+  --accent:#52b8ab; --accent-ink:#0c1b19; --accent-soft:#1d3835;
+  --ok:#73c27f; --ok-soft:#1d3222; --warn:#e3a84f; --warn-soft:#3a2d16; --bad:#ef7d72; --bad-soft:#3c211f;
+  --info:#9cc0d8; --info-soft:#1f2d37; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-body)}
+h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:.01em;margin:0;text-wrap:balance;line-height:1.1}
+h2{font-size:26px} h3{font-size:20px}
+p{margin:0}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono,.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+
+/* top bar */
+.top{background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.top-in{max-width:1240px;margin:0 auto;padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
+.brand{display:flex;flex-direction:column;margin-right:auto}
+.brand b{font-family:var(--f-display);font-size:22px;letter-spacing:.02em}
+.brand span{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel-2)}
+.seg button{border:0;background:transparent;padding:7px 14px;font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.who{display:flex;gap:8px;align-items:center;font-size:14px}
+select,input[type=number],textarea{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:7px 12px;font-weight:500;display:inline-flex;gap:6px;align-items:center}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:disabled{opacity:.45;cursor:not-allowed}
+.btn.danger{color:var(--bad)}
+.btn.sm{padding:4px 9px;font-size:13px}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--accent);padding-left:4px;padding-right:4px}
+
+.guide{max-width:1240px;margin:12px auto 0;padding:0 16px}
+.guide-in{background:var(--accent-soft);border-radius:8px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;font-size:14px}
+.guide-in ol{margin:0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:6px 18px;counter-reset:g}
+.guide-in li{counter-increment:g}
+.guide-in li::before{content:counter(g);display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-size:12px;font-weight:600;margin-right:6px}
+
+main{max-width:1240px;margin:0 auto;padding:16px 16px 60px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:16px;overflow-x:auto}
+.tabs button{border:0;background:transparent;padding:9px 12px;border-bottom:3px solid transparent;font-weight:500;color:var(--muted);white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tabs .count{font-family:var(--f-mono);font-size:12px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:0 6px;margin-left:4px}
+.tabs .pv{font-size:11px;color:var(--muted);margin-left:4px;text-transform:uppercase;letter-spacing:.06em}
+
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:860px){.grid2{grid-template-columns:1fr}}
+.stack{display:flex;flex-direction:column;gap:12px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+.panel-h{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:13px;color:var(--muted);font-weight:500}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:1px 9px;font-size:12.5px;font-weight:500;border:1px solid transparent;white-space:nowrap}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+.chip.info{background:var(--info-soft);color:var(--info)}
+.chip.plain{background:var(--panel-2);border-color:var(--line);color:var(--muted)}
+
+/* checks */
+.checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.checks li{display:grid;grid-template-columns:22px 1fr;gap:8px;font-size:14px;align-items:start}
+.mk{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;margin-top:1px}
+.mk.pass{background:var(--ok-soft);color:var(--ok)}
+.mk.warn{background:var(--warn-soft);color:var(--warn)}
+.mk.fail{background:var(--bad-soft);color:var(--bad)}
+.mk.info{background:var(--info-soft);color:var(--info)}
+
+/* artwork */
+.thumb{width:150px;height:96px;border:1px solid var(--line);border-radius:6px;display:block;flex:none;background:var(--panel-2)}
+.thumb.big{width:100%;height:220px}
+.art path,.art rect,.art circle,.art ellipse,.art line,.art polyline,.art polygon{vector-effect:non-scaling-stroke;stroke-width:1.3px}
+.art .sheet-bg{stroke:none}
+.sheet-svg{width:100%;height:auto;display:block;border-radius:6px}
+.lbl{font:600 9px var(--f-mono);fill:#1b2226;paint-order:stroke;stroke:#ffffffcc;stroke-width:2.5px}
+canvas.thumb{background:var(--panel-2)}
+
+/* jobs */
+.job{display:flex;gap:12px;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.job-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.job-title{font-weight:600}
+.job .meta{font-size:13px;color:var(--muted)}
+@media (max-width:520px){.job{flex-direction:column}.thumb{width:100%;height:140px}}
+.steps{display:flex;gap:0;font-size:12px;margin-top:2px;flex-wrap:wrap}
+.steps span{padding:2px 10px 2px 0;color:var(--muted);display:flex;align-items:center;gap:5px}
+.steps span::before{content:"";width:9px;height:9px;border-radius:50%;border:2px solid var(--line)}
+.steps span.done{color:var(--ink)}
+.steps span.done::before{background:var(--accent);border-color:var(--accent)}
+.steps span.now::before{border-color:var(--accent)}
+.comment{background:var(--warn-soft);border-left:3px solid var(--warn);padding:8px 10px;border-radius:4px;font-size:14px}
+
+.drop{border:2px dashed var(--line);border-radius:8px;padding:16px;text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+
+/* tables */
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{text-align:left;font-weight:600;font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.stat b{font-family:var(--f-mono);font-size:22px;font-weight:500;display:block}
+.stat span{font-size:13px;color:var(--muted)}
+
+.matcard{border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--panel)}
+.swatch{width:18px;height:18px;border-radius:4px;border:1px solid rgba(0,0,0,.2);flex:none}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:12px}
+.sheet{border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--panel-2)}
+.bar{height:8px;border-radius:4px;background:var(--panel-2);border:1px solid var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.bar i.over{background:var(--bad)}
+.preview-note{background:var(--info-soft);color:var(--info);border-radius:8px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:14px;margin-bottom:14px}
+.preview-note .q{font-weight:600}
+.printer{border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;gap:12px;background:var(--panel)}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:14px;z-index:20;max-width:calc(100% - 32px);box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.empty{padding:18px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:8px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:16px;height:0;border-top:2px solid;vertical-align:middle;margin-right:5px}
+.cell-btn{border:1px dashed var(--line);background:transparent;border-radius:6px;padding:2px 8px;font-size:12.5px;color:var(--muted)}
+.copybox{width:100%;height:90px;font:12px var(--f-mono)}
+.fineprint{font-size:12.5px;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.btn,.seg button,.tabs button{transition:background .15s,border-color .15s,color .15s}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-in">
+    <div class="brand"><b>D&amp;T Workshop Manager</b><span>Demo · Hillside Academy (a made-up school, with made-up pupils)</span></div>
+    <div class="seg" role="group" aria-label="Show the app as">
+      <button type="button" id="role-pupil" data-role="pupil">Pupil</button>
+      <button type="button" id="role-teacher" data-role="teacher">Teacher</button>
+      <button type="button" id="role-tech" data-role="tech">Technician</button>
+    </div>
+    <div class="who" id="who"></div>
+    <button type="button" class="btn sm" id="reset">Reset demo</button>
+  </div>
+</header>
+<div class="guide" id="guide">
+  <div class="guide-in">
+    <strong>Try it:</strong>
+    <ol>
+      <li>As pupil Finn, send the sample keyring</li>
+      <li>As the teacher, approve it</li>
+      <li>As the technician, nest the clear acrylic and mark the sheet cut</li>
+    </ol>
+  </div>
+</div>
+<main id="main"></main>
+<div id="measure" aria-hidden="true" style="position:fixed;left:-20000px;top:0;opacity:0;pointer-events:none"></div>
+
+<script>
+'use strict';
+const NS='http://www.w3.org/2000/svg';
+const $=(s,r=document)=>r.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const K=4; // px per mm while measuring
+const LASER={name:'Laser cutter',w:600,h:400};
+const PRINTER_BED=[250,210,210];
+const GAP=3, MARGIN=5;
+const CUT='#ff0000', SCORE='#0000ff', ENGRAVE='#000000';
+const TODAY=new Date();
+function daysAgo(d,h=10,m=0){const t=new Date(TODAY);t.setDate(t.getDate()-d);t.setHours(h,m,0,0);return t}
+function daysAhead(d){const t=new Date(TODAY);t.setDate(t.getDate()+d);return t}
+function fmtWhen(d){
+  if(!d) return '';
+  const day=new Date(d);day.setHours(0,0,0,0);const t=new Date(TODAY);t.setHours(0,0,0,0);
+  const diff=Math.round((t-day)/864e5);
+  const hm=d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  if(diff===0) return 'Today '+hm;
+  if(diff===1) return 'Yesterday '+hm;
+  return d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+}
+function fmtDate(d){return d?d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):''}
+function fmtDur(s){s=Math.max(1,Math.round(s));const h=Math.floor(s/3600),m=Math.floor(s%3600/60),r=s%60;
+  if(h) return `${h} h ${m} min`; if(m) return r&&m<10?`${m} min ${r} s`:`${m} min`; return `${r} s`;}
+const mm=v=>Math.round(v);
+const plural=(n,a,b)=>n===1?a:(b||a+'s');
+
+/* ---------- reference data ---------- */
+const MATERIALS={
+  ply3:{name:'Birch plywood',t:3,w:600,h:400,cost:4.20,speed:14,colour:'#e8d5ad'},
+  mdf3:{name:'MDF',t:3,w:600,h:400,cost:2.10,speed:16,colour:'#c9a57a'},
+  acrc3:{name:'Clear acrylic',t:3,w:600,h:400,cost:7.80,speed:9,colour:'#dcebf0'},
+  acrb3:{name:'Black acrylic',t:3,w:600,h:400,cost:8.40,speed:9,colour:'#4b4f52'}
+};
+const CLASSES={'9T2':'Year 9 · 9T2','10T1':'Year 10 · 10T1','11T1':'Year 11 · 11T1 (GCSE)'};
+const PROJECTS=[
+  {id:'stand',name:'Phone stand',cls:'9T2',kind:'laser',mat:'ply3',due:4},
+  {id:'clip',name:'Cable clip',cls:'9T2',kind:'print',due:9},
+  {id:'keyring',name:'Acrylic keyring',cls:'10T1',kind:'laser',mat:'acrc3',due:6},
+  {id:'nea',name:'NEA prototype, laser parts',cls:'11T1',kind:'laser',mat:'mdf3',due:12},
+  {id:'nea3d',name:'NEA prototype, 3D printed parts',cls:'11T1',kind:'print',due:12}
+];
+const PROJ=Object.fromEntries(PROJECTS.map(p=>[p.id,p]));
+const PUPILS=[
+  ['Grace Ito','9T2'],['Harvey Lane','9T2'],['Isla Kaur','9T2'],['Jacob Reed','9T2'],['Kezia Ward','9T2'],
+  ['Amara Osei','10T1'],['Ben Hollis','10T1'],['Chloe Barker','10T1'],['Dev Patel','10T1'],['Ella Morgan','10T1'],['Finn Doyle','10T1'],
+  ['Leo Martins','11T1'],['Maya Singh','11T1'],['Noah Clarke','11T1'],['Olivia Brennan','11T1']
+].map(([name,cls])=>({id:name.split(' ')[0].toLowerCase(),name,cls}));
+const PUP=Object.fromEntries(PUPILS.map(p=>[p.id,p]));
+const MACHINES=[['laser','Laser cutter'],['printer','3D printers'],['bandsaw','Bandsaw'],['drill','Pillar drill']];
+const PRINTERS=[{id:'pa',name:'Prusa MK3 · A'},{id:'pb',name:'Prusa MK3 · B'}];
+
+/* ---------- sample artwork (all in mm) ---------- */
+function star(cx,cy,r1,r2,n){let d='';for(let i=0;i<n*2;i++){const r=i%2?r2:r1,a=-Math.PI/2+i*Math.PI/n;d+=(i?'L':'M')+(cx+r*Math.cos(a)).toFixed(2)+' '+(cy+r*Math.sin(a)).toFixed(2)+' '}return d+'Z'}
+function svgDoc(w,h,body){return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}mm" height="${h}mm" viewBox="0 0 ${w} ${h}">${body}</svg>`}
+function keyring(w,h,motif){
+  const hole=`<circle cx="${(h/2.4).toFixed(2)}" cy="${h/2}" r="2.6" fill="none" stroke="#ff0000" stroke-width="0.1"/>`;
+  let m='';
+  if(motif==='star') m=`<path d="${star(w*0.62,h/2,h*0.32,h*0.14,5)}" fill="none" stroke="#0000ff" stroke-width="0.1"/>`;
+  if(motif==='wave') m=`<path d="M${w*0.3} ${h/2} Q${w*0.38} ${h*0.2} ${w*0.46} ${h/2} T${w*0.62} ${h/2} T${w*0.78} ${h/2} T${w*0.9} ${h/2}" fill="none" stroke="#0000ff" stroke-width="0.1"/>`;
+  if(motif==='bolt') m=`<path d="M${w*0.6} ${h*0.15} L${w*0.48} ${h*0.55} L${w*0.6} ${h*0.55} L${w*0.52} ${h*0.88} L${w*0.75} ${h*0.42} L${w*0.62} ${h*0.42} L${w*0.7} ${h*0.15} Z" fill="#000000" stroke="none"/>`;
+  return svgDoc(w,h,`<rect x="0.5" y="0.5" width="${w-1}" height="${h-1}" rx="${(h/2.5).toFixed(1)}" fill="none" stroke="#ff0000" stroke-width="0.1"/>${hole}${m}`);
+}
+function phoneStand(){
+  const back=`<path d="M0.5 10 Q0.5 0.5 10 0.5 L70 0.5 Q79.5 0.5 79.5 10 L79.5 109.5 L48 109.5 L48 80 L44.8 80 L44.8 109.5 L0.5 109.5 Z" fill="none" stroke="#ff0000" stroke-width="0.1"/>`;
+  const base=`<path d="M86 50.5 L86 0.5 L166 0.5 L166 50.5 L127.6 50.5 L127.6 22 L124.4 22 L124.4 50.5 Z" fill="none" stroke="#ff0000" stroke-width="0.1"/>`;
+  const motif=`<path d="${star(40,40,18,8,6)}" fill="none" stroke="#0000ff" stroke-width="0.1"/>`;
+  return svgDoc(167,110,back+base+motif);
+}
+function fingerPanel(x0,w,h,f){
+  let d=`M${x0} 0 `;const n=Math.floor(w/f);
+  for(let i=0;i<n;i++){const x=x0+i*f;if(i%2){d+=`L${x} 3 L${x+f} 3 `}else{d+=`L${x} 0 L${x+f} 0 `}}
+  d+=`L${x0+w} 0 L${x0+w} ${h} `;
+  for(let i=n-1;i>=0;i--){const x=x0+i*f;if(i%2){d+=`L${x+f} ${h-3} L${x} ${h-3} `}else{d+=`L${x+f} ${h} L${x} ${h} `}}
+  return d+'Z';
+}
+function boxSides(){
+  const p1=fingerPanel(0.5,100,70,10),p2=fingerPanel(106,100,70,10);
+  return svgDoc(207,71,`<path d="${p1}" fill="none" stroke="#ff0000" stroke-width="0.1"/><path d="${p2}" fill="none" stroke="#ff0000" stroke-width="0.1"/><circle cx="50.5" cy="35" r="9" fill="none" stroke="#ff0000" stroke-width="0.1"/><path d="M130 20 L182 20 M130 35 L182 35 M130 50 L182 50" fill="none" stroke="#0000ff" stroke-width="0.1"/>`);
+}
+function plaque(){
+  let zz='M18 34 ';for(let i=0;i<10;i++)zz+=`L${24+i*10} ${i%2?34:18} `;
+  return svgDoc(141,51,`<rect x="0.5" y="0.5" width="140" height="50" rx="6" fill="none" stroke="#ff0000" stroke-width="0.1"/><circle cx="8" cy="25.5" r="2" fill="none" stroke="#ff0000" stroke-width="0.1"/><circle cx="133" cy="25.5" r="2" fill="none" stroke="#ff0000" stroke-width="0.1"/><path d="${zz}" fill="none" stroke="#0000ff" stroke-width="0.1"/><rect x="118" y="16" width="8" height="8" fill="#000000" stroke="none"/><rect x="118" y="28" width="8" height="8" fill="#000000" stroke="none"/>`);
+}
+/* a file with the usual mistakes: no mm units, text left as text, nearly-red line, open cut line, a duplicate */
+function problemFile(){
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="110" viewBox="0 0 240 110">
+<rect x="2" y="2" width="236" height="106" rx="40" fill="none" stroke="#e8231f" stroke-width="1"/>
+<circle cx="38" cy="55" r="10" fill="none" stroke="#ff0000" stroke-width="1"/>
+<circle cx="38" cy="55" r="10" fill="none" stroke="#ff0000" stroke-width="1"/>
+<polyline points="80,30 200,30 200,80 80,80" fill="none" stroke="#ff0000" stroke-width="1"/>
+<text x="95" y="62" font-family="Comic Sans MS" font-size="26" fill="#0000ff">FINN</text>
+</svg>`;
+}
+
+/* ---------- 3D meshes ---------- */
+function boxTris(x0,y0,z0,dx,dy,dz,out){
+  const c=(i,j,k)=>[x0+i*dx,y0+j*dy,z0+k*dz];
+  const quads=[[[0,0,0],[0,1,0],[1,1,0],[1,0,0]],[[0,0,1],[1,0,1],[1,1,1],[0,1,1]],[[0,0,0],[1,0,0],[1,0,1],[0,0,1]],
+    [[0,1,0],[0,1,1],[1,1,1],[1,1,0]],[[0,0,0],[0,0,1],[0,1,1],[0,1,0]],[[1,0,0],[1,1,0],[1,1,1],[1,0,1]]];
+  for(const q of quads){const p=q.map(v=>c(...v));out.push(...p[0],...p[1],...p[2],...p[0],...p[2],...p[3])}
+  return out;
+}
+function meshFrom(boxes){const a=[];boxes.forEach(b=>boxTris(...b,a));return new Float32Array(a)}
+const MESH={
+  clip:()=>meshFrom([[0,0,0,32,12,3],[0,0,3,3,12,11],[29,0,3,3,12,6],[3,0,11,8,12,3]]),
+  bracket:()=>meshFrom([[0,0,0,60,30,4],[0,0,4,4,30,40],[4,0,4,20,4,20],[4,26,4,20,4,20]]),
+  hub:()=>meshFrom([[0,0,0,44,44,6],[14,14,6,16,16,18]]),
+  big:()=>meshFrom([[0,0,0,300,40,20],[0,0,20,40,40,30]])
+};
+function makeBinarySTL(tris){
+  const n=tris.length/9, buf=new ArrayBuffer(84+n*50), dv=new DataView(buf);
+  dv.setUint32(80,n,true);
+  for(let i=0;i<n;i++){const o=84+i*50;for(let k=0;k<9;k++)dv.setFloat32(o+12+k*4,tris[i*9+k],true)}
+  return buf;
+}
+
+/* ---------- SVG checks ---------- */
+function parseLen(v){if(v==null)return null;const m=String(v).trim().match(/^(-?[\d.]+)\s*(mm|cm|in|px|pt)?$/i);if(!m)return null;
+  const u=(m[2]||'').toLowerCase();const f={mm:1,cm:10,in:25.4,pt:25.4/72,px:25.4/96,'':25.4/96}[u];return {mm:parseFloat(m[1])*f,unit:u,n:parseFloat(m[1])}}
+function toHex(c){
+  if(!c||c==='none'||c==='transparent')return null;
+  const m=c.match(/rgba?\(([^)]+)\)/);if(!m)return c.startsWith('url')?'pattern':null;
+  const p=m[1].split(/[\s,\/]+/).filter(Boolean).map(Number);
+  if(p.length>3&&p[3]===0)return null;
+  return '#'+p.slice(0,3).map(v=>Math.round(v).toString(16).padStart(2,'0')).join('');
+}
+function sanitize(svg){
+  svg.querySelectorAll('script,foreignObject,iframe').forEach(n=>n.remove());
+  svg.querySelectorAll('*').forEach(n=>[...n.attributes].forEach(a=>{
+    if(/^on/i.test(a.name))n.removeAttribute(a.name);
+    if(/href$/i.test(a.name)&&!/^(#|data:image\/)/.test(a.value))n.removeAttribute(a.name);
+  }));
+}
+function explicitFill(el,root){for(let n=el;n&&n!==root;n=n.parentElement){const a=n.getAttribute('fill');if(a)return a!=='none';if(n.style&&n.style.fill)return n.style.fill!=='none'}return null}
+const NUM='(-?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][-+]?\\d+)?)';
+const MOVE_RE=new RegExp('^([Mm])[\\s,]*'+NUM+'[\\s,]*'+NUM+'([\\s\\S]*)$');
+function pathClosed(el,live,s){
+  const d=(el.getAttribute('d')||'').trim();
+  const parts=d.split(/(?=[Mm])/).map(p=>p.trim()).filter(Boolean);
+  let cur={x:0,y:0},open=false;
+  parts.forEach((p,i)=>{
+    const m=p.match(MOVE_RE);if(!m){open=true;return}
+    let x=+m[2],y=+m[3];if(m[1]==='m'&&i>0){x+=cur.x;y+=cur.y}
+    let rest=m[4].trim();if(rest&&/^[-+.\d]/.test(rest))rest=(m[1]==='m'?'l ':'L ')+rest;
+    if(!rest){cur={x,y};return}
+    const hasZ=/[Zz]\s*$/.test(rest);
+    const t=document.createElementNS(NS,'path');t.setAttribute('d',`M${x} ${y} ${rest}`);live.appendChild(t);
+    const e=t.getPointAtLength(t.getTotalLength());t.remove();
+    if(!hasZ&&Math.hypot(e.x-x,e.y-y)*s>0.05)open=true;
+    cur=hasZ?{x,y}:{x:e.x,y:e.y};
+  });
+  return !open;
+}
+function isClosed(el,live,s){
+  const t=el.tagName.toLowerCase();
+  if(['rect','circle','ellipse','polygon'].includes(t))return true;
+  if(t==='line')return false;
+  if(t==='polyline'){const pts=(el.getAttribute('points')||'').trim().split(/[\s,]+/).map(Number);if(pts.length<4)return false;
+    return Math.hypot(pts[0]-pts[pts.length-2],pts[1]-pts[pts.length-1])*s<0.05}
+  if(t==='path')return pathClosed(el,live,s);
+  return true;
+}
+function analyseSVG(text,matId){
+  const checks=[];const add=(level,t)=>checks.push({level,text:t});
+  const mat=MATERIALS[matId]||MATERIALS.ply3;
+  let doc=null;try{doc=new DOMParser().parseFromString(text,'image/svg+xml')}catch(e){}
+  if(!doc||doc.querySelector('parsererror')||doc.documentElement.nodeName.toLowerCase()!=='svg'){
+    return {fatal:true,checks:[{level:'fail',text:"This file couldn't be read as an SVG. Save it again from your design software as SVG and try once more."}]};
+  }
+  const src=doc.documentElement;sanitize(src);
+  const W=parseLen(src.getAttribute('width')),H=parseLen(src.getAttribute('height'));
+  let vb=(src.getAttribute('viewBox')||'').trim().split(/[\s,]+/).map(Number);
+  let s;
+  if(vb.length!==4||vb.some(isNaN)||!vb[2]){
+    if(W&&H){vb=[0,0,W.n,H.n];s=W.mm/W.n}
+    else return {fatal:true,checks:[{level:'fail',text:"The file doesn't say how big it is. Save it again with the page set to the size of your design."}]};
+  } else s=W?W.mm/vb[2]:25.4/96;
+  if(!W||W.unit===''||W.unit==='px') add('warn',"The file has no size in millimetres, so it's been read at 96 dpi (the usual screen setting). Check it measures what you expect.");
+  const live=document.importNode(src,true);
+  live.setAttribute('width',vb[2]*s*K);live.setAttribute('height',vb[3]*s*K);
+  live.setAttribute('viewBox',vb.join(' '));live.setAttribute('preserveAspectRatio','none');
+  const host=$('#measure');host.innerHTML='';host.appendChild(live);
+  const L=live.getBoundingClientRect();
+  const rc=live.getScreenCTM();const rootDet=rc?Math.abs(rc.a*rc.d-rc.b*rc.c):0;
+  const els=[...live.querySelectorAll('path,rect,circle,ellipse,line,polyline,polygon,text,image,use')]
+    .filter(el=>!el.closest('defs,clipPath,mask,symbol,pattern,marker'));
+  let bx=Infinity,by=Infinity,bx2=-Infinity,by2=-Infinity;
+  const cut={n:0,len:0,open:0,tiny:0,thick:0,dup:0};let score=0,raster=0,texts=0,images=0,uses=0;
+  const near=new Set(),other=new Set(),seen=new Set();
+  for(const el of els){
+    const tag=el.tagName.toLowerCase();
+    const r=el.getBoundingClientRect();
+    if(r.width===0&&r.height===0)continue;
+    const x=(r.left-L.left)/K,y=(r.top-L.top)/K,w=r.width/K,h=r.height/K;
+    bx=Math.min(bx,x);by=Math.min(by,y);bx2=Math.max(bx2,x+w);by2=Math.max(by2,y+h);
+    if(tag==='text'){texts++;continue}
+    if(tag==='image'){images++;raster+=w*h;continue}
+    if(tag==='use'){uses++;continue}
+    const cs=getComputedStyle(el);
+    if(cs.display==='none')continue;
+    const stroke=toHex(cs.stroke),fill=toHex(cs.fill),ex=explicitFill(el,live);
+    const ctm=el.getScreenCTM();const sc=ctm&&rootDet?Math.sqrt(Math.abs(ctm.a*ctm.d-ctm.b*ctm.c)/rootDet):1;
+    const len=el.getTotalLength?el.getTotalLength()*sc*s:0;
+    if(stroke){
+      if(stroke===CUT){
+        cut.n++;cut.len+=len;
+        if(Math.max(w,h)<1.5)cut.tiny++;
+        if(parseFloat(cs.strokeWidth)*sc*s>0.3)cut.thick++;
+        if(!isClosed(el,live,s))cut.open++;
+        const key=tag+'|'+['d','x','y','width','height','cx','cy','r','rx','ry','points','transform'].map(a=>el.getAttribute(a)).join('|');
+        if(seen.has(key))cut.dup++;else seen.add(key);
+      } else if(stroke===SCORE||stroke===ENGRAVE){score+=len}
+      else{const v=parseInt(stroke.slice(1),16);const R=v>>16&255,G=v>>8&255,B=v&255;
+        if(stroke!=='pattern'&&R>=170&&G<=95&&B<=95)near.add(stroke);else other.add(stroke==='pattern'?'a pattern or gradient':stroke)}
+    }
+    if(fill&&(!stroke||ex===true)){raster+=w*h*0.6}
+  }
+  host.innerHTML='';
+  if(!isFinite(bx)) return {fatal:true,checks:[{level:'fail',text:'There is no drawing in this file. Check you exported the right page or layer.'}]};
+  const bw=bx2-bx,bh=by2-by;
+  const inner={w:LASER.w-2*MARGIN,h:LASER.h-2*MARGIN};
+  const fits=bw<=inner.w&&bh<=inner.h, fitsRot=bh<=inner.w&&bw<=inner.h;
+  if(fits||fitsRot) add('pass',`Fits the laser bed and a ${mat.w} × ${mat.h} mm sheet: your design is ${mm(bw)} × ${mm(bh)} mm.`);
+  else add('fail',`Too big for the laser: your design is ${mm(bw)} × ${mm(bh)} mm, and the most it can cut is ${inner.w} × ${inner.h} mm. Make it smaller or split it into parts.`);
+  if(near.size) add('fail',`Some lines are nearly red (${[...near].map(c=>c.toUpperCase()).join(', ')}) but not pure red, so the laser won't cut them. Change them to red, #FF0000.`);
+  if(other.size) add('fail',`Lines in ${[...other].map(c=>c.toUpperCase()).join(', ')} don't mean anything to this laser. Use red to cut, blue to score lines, or black to engrave.`);
+  if(!near.size&&!other.size) add('pass','Line colours match the laser: red cuts, blue scores, black engraves.');
+  if(texts) add('fail',`${texts} piece${texts>1?'s':''} of text ${texts>1?'are':'is'} still text. Convert text to outlines (paths) first, or the laser may swap your font.`);
+  else add('pass','No text left as text.');
+  if(cut.n===0) add('warn','There are no red cut lines, so nothing will be cut out. Fine if this is engraving only.');
+  else if(cut.open) add('warn',`${cut.open} cut ${plural(cut.open,'line isn\'t','lines aren\'t')} closed, so the part may not drop out. Join the ends.`);
+  else add('pass',`All ${cut.n} cut ${plural(cut.n,'shape is','shapes are')} closed.`);
+  if(cut.dup) add('warn',`${cut.dup} cut ${plural(cut.dup,'line sits','lines sit')} exactly on top of another, so ${cut.dup>1?'they':'it'}'d be cut twice and may scorch. Delete the copy.`);
+  if(cut.tiny) add('warn',`${cut.tiny} cut ${plural(cut.tiny,'shape is','shapes are')} under 1.5 mm. Holes that small may not cut cleanly.`);
+  if(cut.thick) add('warn',`${cut.thick} cut ${plural(cut.thick,'line is','lines are')} thicker than 0.3 mm. Set cut lines to hairline (0.1 mm).`);
+  if(images) add('warn',`Contains ${images} picture${images>1?'s':''}. ${images>1?'They':'It'}'ll be engraved line by line, which is slow.`);
+  if(uses) add('warn','Uses linked copies of shapes. Check the preview shows everything you expect.');
+  const est=30+cut.len/mat.speed+score/60+raster/22+cut.n*1.5;
+  add('info',`Estimated laser time in ${mat.t} mm ${mat.name.toLowerCase()}: about ${fmtDur(est)} per copy.`);
+  return {checks,est,art:{markup:live.innerHTML,s,vbx:vb[0],vby:vb[1],bx,by,bw,bh}};
+}
+
+/* ---------- STL checks ---------- */
+function readSTL(buf){
+  const dv=new DataView(buf);
+  if(buf.byteLength>=84){const n=dv.getUint32(80,true);if(84+n*50===buf.byteLength){
+    const t=new Float32Array(n*9);for(let i=0;i<n;i++)for(let k=0;k<9;k++)t[i*9+k]=dv.getFloat32(84+i*50+12+k*4,true);return t}}
+  const txt=new TextDecoder().decode(buf);
+  const v=[...txt.matchAll(/vertex\s+(\S+)\s+(\S+)\s+(\S+)/g)].map(m=>[+m[1],+m[2],+m[3]]).flat();
+  return v.length>=9?new Float32Array(v.slice(0,v.length-v.length%9)):null;
+}
+function analyseSTL(tris){
+  const checks=[];const add=(level,t)=>checks.push({level,text:t});
+  if(!tris||!tris.length) return {fatal:true,checks:[{level:'fail',text:"This file couldn't be read as an STL. Export it again from your CAD software as STL (or 3MF via PrusaSlicer)."}]};
+  let mn=[Infinity,Infinity,Infinity],mx=[-Infinity,-Infinity,-Infinity],vol=0;
+  for(let i=0;i<tris.length;i+=9){
+    for(let k=0;k<9;k+=3)for(let a=0;a<3;a++){const v=tris[i+k+a];if(v<mn[a])mn[a]=v;if(v>mx[a])mx[a]=v}
+    const [ax,ay,az,bx,by,bz,cx,cy,cz]=tris.slice(i,i+9);
+    vol+=(ax*(by*cz-bz*cy)-ay*(bx*cz-bz*cx)+az*(bx*cy-by*cx))/6;
+  }
+  vol=Math.abs(vol);
+  const dims=[0,1,2].map(a=>mx[a]-mn[a]);
+  const sd=[...dims].sort((a,b)=>b-a);
+  const ds=dims.map(mm).join(' × ');
+  if(dims[0]<=PRINTER_BED[0]&&dims[1]<=PRINTER_BED[1]&&dims[2]<=PRINTER_BED[2]) add('pass',`Fits the Prusa MK3 (250 × 210 × 210 mm): your model is ${ds} mm.`);
+  else if(sd[0]<=250&&sd[1]<=210&&sd[2]<=210) add('warn',`Fits the printer only if it's turned on its side (${ds} mm). The technician can rotate it.`);
+  else add('fail',`Too big for the printer: your model is ${ds} mm, and the most it can print is 250 × 210 × 210 mm. Scale it down or split it into parts.`);
+  if(sd[0]<3) add('warn','The model is under 3 mm across. Was it exported in centimetres or metres instead of millimetres?');
+  if(sd[2]<1&&sd[0]>=3) add('warn','Part of the model is thinner than 1 mm, which may not print.');
+  if(vol<1) add('warn',"The model doesn't look like a closed solid. Check it in your CAD software.");
+  else add('pass',`Closed solid, ${(vol/1000).toFixed(1)} cm³.`);
+  const grams=Math.max(1,vol/1000*1.24*0.45),hours=0.15+grams/8;
+  add('info',`About ${Math.round(grams)} g of PLA and roughly ${fmtDur(hours*3600)} to print.`);
+  return {checks,stl:{dims,vol,grams,hours,tris:tris.length/9}};
+}
+function drawMesh(cv,tris){
+  const ctx=cv.getContext('2d');const dpr=window.devicePixelRatio||1;
+  const W=cv.clientWidth||150,H=cv.clientHeight||96;cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);if(!tris)return;
+  const c30=Math.cos(Math.PI/6),faces=[];let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+  const Lv=[0.35,0.55,0.76];
+  for(let i=0;i<tris.length;i+=9){
+    const p=[];let dep=0;
+    for(let k=0;k<9;k+=3){const x=tris[i+k],y=tris[i+k+1],z=tris[i+k+2];const X=(x-y)*c30,Y=(x+y)*0.5-z;p.push([X,Y]);dep+=x+y+z;
+      x0=Math.min(x0,X);x1=Math.max(x1,X);y0=Math.min(y0,Y);y1=Math.max(y1,Y)}
+    const u=[tris[i+3]-tris[i],tris[i+4]-tris[i+1],tris[i+5]-tris[i+2]],v=[tris[i+6]-tris[i],tris[i+7]-tris[i+1],tris[i+8]-tris[i+2]];
+    const n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];const nl=Math.hypot(...n)||1;
+    faces.push({p,dep,sh:Math.abs((n[0]*Lv[0]+n[1]*Lv[1]+n[2]*Lv[2])/nl)});
+  }
+  faces.sort((a,b)=>a.dep-b.dep);
+  const sc=Math.min((W-16)/(x1-x0||1),(H-16)/(y1-y0||1)),ox=(W-(x1-x0)*sc)/2-x0*sc,oy=(H-(y1-y0)*sc)/2-y0*sc;
+  for(const f of faces){
+    const l=Math.round(30+f.sh*42);ctx.fillStyle=ctx.strokeStyle=`hsl(173 42% ${l}%)`;
+    ctx.beginPath();f.p.forEach(([X,Y],i)=>i?ctx.lineTo(X*sc+ox,Y*sc+oy):ctx.moveTo(X*sc+ox,Y*sc+oy));ctx.closePath();ctx.fill();ctx.lineWidth=0.6;ctx.stroke();
+  }
+}
+
+/* ---------- nesting ---------- */
+function packSheet(W,H,items){
+  let free=[{x:MARGIN,y:MARGIN,w:W-2*MARGIN+GAP,h:H-2*MARGIN+GAP}];
+  const placed=[],rest=[];
+  for(const it of items){
+    let best=null;
+    for(const rot of [false,true]){
+      const w=(rot?it.h:it.w)+GAP,h=(rot?it.w:it.h)+GAP;
+      for(const f of free){
+        if(w<=f.w+1e-6&&h<=f.h+1e-6&&(!best||f.y<best.y-1e-6||(Math.abs(f.y-best.y)<1e-6&&f.x<best.x))) best={x:f.x,y:f.y,w,h,rot};
+      }
+    }
+    if(!best){rest.push(it);continue}
+    placed.push({...best,it});
+    const nf=[];
+    for(const f of free){
+      if(!(best.x<f.x+f.w&&best.x+best.w>f.x&&best.y<f.y+f.h&&best.y+best.h>f.y)){nf.push(f);continue}
+      if(best.x>f.x)nf.push({x:f.x,y:f.y,w:best.x-f.x,h:f.h});
+      if(best.x+best.w<f.x+f.w)nf.push({x:best.x+best.w,y:f.y,w:f.x+f.w-best.x-best.w,h:f.h});
+      if(best.y>f.y)nf.push({x:f.x,y:f.y,w:f.w,h:best.y-f.y});
+      if(best.y+best.h<f.y+f.h)nf.push({x:f.x,y:best.y+best.h,w:f.w,h:f.y+f.h-best.y-best.h});
+    }
+    free=nf.filter((a,i)=>!nf.some((b,j)=>j!==i&&a.x>=b.x&&a.y>=b.y&&a.x+a.w<=b.x+b.w&&a.y+a.h<=b.y+b.h&&(j<i||!(a.x===b.x&&a.y===b.y&&a.w===b.w&&a.h===b.h))));
+  }
+  return {placed,rest};
+}
+function leftover(sh){const bottom=Math.max(...sh.placed.map(p=>p.y+p.h));const h=Math.floor(sh.H-bottom);return h>=40&&sh.W>=100?{w:sh.W,h}:null}
+function nestBatch(matId){
+  const mat=MATERIALS[matId];
+  const jobs=state.jobs.filter(j=>j.kind==='laser'&&j.mat===matId&&j.status==='approved');
+  let items=[];
+  jobs.forEach(j=>{for(let q=j.cutCount||0;q<j.qty;q++)items.push({w:j.art.bw,h:j.art.bh,job:j})});
+  items.sort((a,b)=>b.w*b.h-a.w*a.h);
+  const sheets=[];
+  const offs=state.offcuts.filter(o=>o.mat===matId).sort((a,b)=>b.w*b.h-a.w*a.h);
+  for(const o of offs){if(!items.length)break;const r=packSheet(o.w,o.h,items);if(r.placed.length){sheets.push({src:'offcut',off:o.id,W:o.w,H:o.h,placed:r.placed});items=r.rest}}
+  let full=0,short=false,unfit=[];
+  while(items.length){
+    if(full>=state.stock[matId]){short=true;break}
+    const r=packSheet(mat.w,mat.h,items);
+    if(!r.placed.length){unfit=items;break}
+    sheets.push({src:'sheet',W:mat.w,H:mat.h,placed:r.placed});items=r.rest;full++;
+  }
+  sheets.forEach(sh=>{sh.util=sh.placed.reduce((a,p)=>a+p.it.w*p.it.h,0)/(sh.W*sh.H);sh.est=sh.placed.reduce((a,p)=>a+p.it.job.est,0);sh.left=leftover(sh)});
+  return {mat:matId,sheets,short,left:items.length,unfit:unfit.length};
+}
+function placeTf(p){
+  const a=p.it.job.art;const inner=`translate(${-a.bx} ${-a.by}) scale(${a.s}) translate(${-a.vbx} ${-a.vby})`;
+  return p.rot?`translate(${p.x+a.bh} ${p.y}) rotate(90) ${inner}`:`translate(${p.x} ${p.y}) ${inner}`;
+}
+function sheetSVG(sh,matId,forExport){
+  const groups=sh.placed.map(p=>`<g transform="${placeTf(p)}">${p.it.job.art.markup}</g>`).join('');
+  if(forExport) return `<svg xmlns="http://www.w3.org/2000/svg" width="${sh.W}mm" height="${sh.H}mm" viewBox="0 0 ${sh.W} ${sh.H}">${groups}</svg>`;
+  const labels=sh.placed.map(p=>{const w=p.w-GAP,h=p.h-GAP;const pu=PUP[p.it.job.pupil];return `<text class="lbl" x="${p.x+w/2}" y="${p.y+h/2+3}" text-anchor="middle">${esc(pu.name.split(' ').map(s=>s[0]).join(''))}</text>`}).join('');
+  const left=sh.left?`<rect x="0" y="${sh.H-sh.left.h}" width="${sh.W}" height="${sh.left.h}" fill="none" stroke="#888" stroke-dasharray="4 3" class="sheet-bg"/>`:'';
+  return `<svg class="sheet-svg art" viewBox="-3 -3 ${sh.W+6} ${sh.H+6}" role="img" aria-label="Sheet layout"><rect class="sheet-bg" x="0" y="0" width="${sh.W}" height="${sh.H}" rx="2" fill="${MATERIALS[matId].colour}"/>${left}${groups}${labels}</svg>`;
+}
+
+/* ---------- state ---------- */
+let state;
+function seed(){
+  const jobs=[];let n=1;
+  const L=(pupil,project,mat,qty,svg,file,status,ago,extra={})=>jobs.push({id:'j'+(n++),pupil,project,kind:'laser',mat,qty,svg,file,status,submitted:daysAgo(ago,9+(n%6),n*7%60),...extra});
+  const P=(pupil,project,meshKey,file,status,ago,extra={})=>jobs.push({id:'j'+(n++),pupil,project,kind:'print',mat:'pla',qty:1,meshKey,file,status,submitted:daysAgo(ago,10,n*5%60),...extra});
+  L('amara','keyring','acrc3',2,keyring(56,26,'star'),'amara-keyring.svg','submitted',0);
+  L('ben','keyring','acrb3',1,keyring(60,24,'bolt'),'ben_keyring_v2.svg','submitted',0);
+  L('chloe','keyring','acrc3',2,keyring(54,26,'wave'),'keyring chloe.svg','approved',1,{approvedAt:daysAgo(0,8,40)});
+  L('dev','keyring','acrc3',3,keyring(58,25,'star'),'dev-keyring-final.svg','approved',1,{approvedAt:daysAgo(0,8,42)});
+  L('ella','keyring','acrb3',1,keyring(70,30,'wave'),'ella.svg','returned',2,{comment:'Your hole is too close to the edge and could snap. Move it 2 mm further in, then send it again.',returnedAt:daysAgo(1,15,10)});
+  L('grace','stand','ply3',1,phoneStand(),'grace-phone-stand.svg','approved',2,{approvedAt:daysAgo(1,11,5)});
+  L('harvey','stand','ply3',1,phoneStand(),'phone stand harvey.svg','approved',2,{approvedAt:daysAgo(1,11,6)});
+  L('isla','stand','ply3',1,phoneStand(),'isla_stand.svg','submitted',1);
+  L('jacob','stand','ply3',1,phoneStand(),'jacob-stand.svg','cut',4,{approvedAt:daysAgo(3,9),cutAt:daysAgo(1,13,20),cutCount:1});
+  L('leo','nea','mdf3',1,boxSides(),'leo-NEA-box-sides.svg','approved',3,{approvedAt:daysAgo(2,14,0)});
+  L('maya','nea','ply3',2,plaque(),'maya_sign_prototype.svg','approved',3,{approvedAt:daysAgo(2,14,2)});
+  P('noah','nea3d','bracket','noah-hinge-bracket.stl','printing',2,{approvedAt:daysAgo(1,9),printer:'pa',startedAt:daysAgo(0,8,15)});
+  P('olivia','nea3d','hub','olivia-lamp-hub.stl','approved',1,{approvedAt:daysAgo(0,9,30)});
+  P('kezia','clip','clip','kezia cable clip.stl','submitted',0);
+  P('grace','clip','clip','grace-clip.stl','printed',5,{approvedAt:daysAgo(4),printedAt:daysAgo(2,15)});
+  for(const j of jobs){
+    if(j.kind==='laser'){const r=analyseSVG(j.svg,j.mat);Object.assign(j,{checks:r.checks,est:r.est,art:r.art})}
+    else{j.mesh=MESH[j.meshKey]();const r=analyseSTL(j.mesh);Object.assign(j,{checks:r.checks,stl:r.stl})}
+    j.cutCount=j.cutCount||0;
+  }
+  const ind={};
+  PUPILS.forEach((p,i)=>{ind[p.id]={laser:daysAgo(30+i*3),printer:daysAgo(40+i*2),bandsaw:i%3?daysAgo(60+i):null,drill:daysAgo(55+i)}});
+  ind.ben.laser=null;ind.kezia.printer=null;ind.finn.bandsaw=null;ind.isla.laser=null;
+  return {
+    role:'pupil',pupil:'finn',teacherTab:'approvals',techTab:'queue',guide:true,
+    jobs,ind,
+    stock:{ply3:14,mdf3:22,acrc3:6,acrb3:3},reorder:{ply3:5,mdf3:8,acrc3:4,acrb3:4},
+    pla:2350,
+    offcuts:[{id:'o1',mat:'ply3',w:600,h:140},{id:'o2',mat:'ply3',w:250,h:180},{id:'o3',mat:'acrc3',w:600,h:95},{id:'o4',mat:'mdf3',w:300,h:200}],
+    usage:{'9T2':{area:610000,cost:11.40},'10T1':{area:240000,cost:8.10},'11T1':{area:1180000,cost:21.70}},
+    budget:{'9T2':40,'10T1':40,'11T1':80},
+    staff:[
+      {name:'Mrs Lindqvist',role:'Head of D&T',acc:new Date(2022,0,20)},
+      {name:'Mr Okafor',role:'Teacher of D&T',acc:new Date(2023,5,14)},
+      {name:'Ms Price',role:'D&T technician',acc:new Date(2021,2,2)}
+    ],
+    draft:{project:'keyring',mat:'acrc3',qty:1},
+    nest:null,returning:null,feedback:{},progressProject:'keyring',evidencePupil:'leo',classFilter:'all'
+  };
+}
+
+/* ---------- helpers ---------- */
+const STATUS={
+  submitted:['Waiting for teacher','info'],returned:['Sent back to fix','warn'],approved:['Approved, in the queue','ok'],
+  printing:['Printing now','info'],cut:['Ready to collect','ok'],printed:['Ready to collect','ok'],collected:['Collected','plain']
+};
+const chip=(t,c='plain')=>`<span class="chip ${c}">${esc(t)}</span>`;
+function statusChip(j){const [t,c]=STATUS[j.status];return chip(t,c)}
+function checkSummary(checks){
+  const f=checks.filter(c=>c.level==='fail').length,w=checks.filter(c=>c.level==='warn').length;
+  if(f) return chip(`${f} ${plural(f,'problem')}`,'bad');
+  if(w) return chip(`${w} ${plural(w,'warning')}`,'warn');
+  return chip('All checks passed','ok');
+}
+function checkList(checks){
+  const mk={pass:'✓',warn:'!',fail:'✕',info:'i'};
+  return `<ul class="checks">${checks.map(c=>`<li><span class="mk ${c.level}" aria-hidden="true">${mk[c.level]}</span><span>${esc(c.text)}</span></li>`).join('')}</ul>`;
+}
+function thumb(j,cls='thumb'){
+  if(j.kind==='print') return `<canvas class="${cls}" data-mesh="${j.id}" aria-label="3D model preview"></canvas>`;
+  const a=j.art,pad=Math.max(a.bw,a.bh)*0.06;
+  const x=a.vbx+(a.bx-pad)/a.s,y=a.vby+(a.by-pad)/a.s,w=(a.bw+2*pad)/a.s,h=(a.bh+2*pad)/a.s;
+  return `<svg class="${cls} art" viewBox="${x} ${y} ${w} ${h}" preserveAspectRatio="xMidYMid meet" style="background:${MATERIALS[j.mat].colour}" role="img" aria-label="Design preview">${a.markup}</svg>`;
+}
+function matLabel(j){return j.kind==='print'?'PLA, Prusa MK3':`${MATERIALS[j.mat].t} mm ${MATERIALS[j.mat].name.toLowerCase()}`}
+function inducted(j){return !!state.ind[j.pupil][j.kind==='print'?'printer':'laser']}
+function refreshMeshes(){
+  document.querySelectorAll('canvas[data-mesh]').forEach(cv=>{
+    const id=cv.dataset.mesh;const tris=id==='draft'?state.draft.mesh:(state.jobs.find(j=>j.id===id)||{}).mesh;drawMesh(cv,tris);
+  });
+}
+let toastTimer;
+function toast(msg){let t=$('.toast');if(!t){t=document.createElement('div');t.className='toast';t.setAttribute('role','status');document.body.appendChild(t)}
+  t.textContent=msg;clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.remove(),3200)}
+function steps(j){
+  const order=j.kind==='print'?['submitted','approved','printing','printed','collected']:['submitted','approved','cut','collected'];
+  const labels=j.kind==='print'?['Sent','Approved','Printing','Printed','Collected']:['Sent','Approved','Cut','Collected'];
+  const at=j.status==='returned'?0:order.indexOf(j.status);
+  return `<div class="steps" aria-label="Progress">${labels.map((l,i)=>`<span class="${i<=at?'done':''} ${i===at+1&&j.status!=='returned'?'now':''}">${l}</span>`).join('')}</div>`;
+}
+
+/* ---------- pupil ---------- */
+function renderPupil(){
+  const p=PUP[state.pupil];const d=state.draft;
+  const projects=PROJECTS.filter(x=>x.cls===p.cls);
+  if(!projects.find(x=>x.id===d.project)){d.project=projects[0].id;d.mat=projects[0].mat||'pla';clearDraftFile()}
+  const proj=PROJ[d.project];
+  const mine=state.jobs.filter(j=>j.pupil===p.id).sort((a,b)=>b.submitted-a.submitted);
+  const res=d.result;
+  const fails=res?res.checks.filter(c=>c.level==='fail').length:0;
+  const indOk=!!state.ind[p.id][proj.kind==='print'?'printer':'laser'];
+  const samples=proj.kind==='laser'
+    ?`<button type="button" class="btn sm" data-act="sample" data-s="good">Use the sample keyring</button><button type="button" class="btn sm" data-act="sample" data-s="bad">Try a file with mistakes</button>`
+    :`<button type="button" class="btn sm" data-act="sample" data-s="clip">Use the sample cable clip</button><button type="button" class="btn sm" data-act="sample" data-s="big">Try a model that's too big</button>`;
+  const returning=state.returning?state.jobs.find(j=>j.id===state.returning):null;
+  return `
+  <div class="grid2">
+    <section class="panel" id="send" aria-labelledby="send-h">
+      <div class="panel-h"><h2 id="send-h">${returning?'Fix and send again':'Send a job to the workshop'}</h2><span class="muted small">${esc(CLASSES[p.cls])}</span></div>
+      ${returning?`<div class="comment" style="margin-bottom:12px"><strong>${esc('Mr Okafor')}:</strong> ${esc(returning.comment)}</div>`:''}
+      <div class="stack">
+        <div class="fields">
+          <div class="field"><label for="f-project">Project</label>
+            <select id="f-project" data-chg="project">${projects.map(x=>`<option value="${x.id}" ${x.id===d.project?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>
+          ${proj.kind==='laser'?`<div class="field"><label for="f-mat">Material</label>
+            <select id="f-mat" data-chg="mat">${Object.entries(MATERIALS).map(([k,m])=>`<option value="${k}" ${k===d.mat?'selected':''}>${m.t} mm ${esc(m.name.toLowerCase())}</option>`).join('')}</select></div>`
+            :`<div class="field"><label>Printer</label><div style="padding:6px 0">Prusa MK3, PLA</div></div>`}
+          <div class="field"><label for="f-qty">Copies</label><input id="f-qty" type="number" min="1" max="30" value="${d.qty}" data-chg="qty"></div>
+        </div>
+        <p class="small muted">Due ${esc(fmtDate(daysAhead(proj.due)))}. ${proj.kind==='laser'?'Draw in mm. Red lines cut, blue lines score, black engraves.':'Export as STL in millimetres.'}</p>
+        <div class="drop" id="drop">
+          <label class="btn primary" for="f-file">Choose your ${proj.kind==='laser'?'.svg':'.stl'} file</label>
+          <input id="f-file" type="file" accept="${proj.kind==='laser'?'.svg,image/svg+xml':'.stl'}" data-chg="file" style="position:absolute;width:1px;height:1px;opacity:0">
+          <span class="small muted">or drop it here, or</span>
+          <div class="row" style="justify-content:center">${samples}</div>
+        </div>
+        ${res?`
+          <div class="stack">
+            <div class="row"><strong>${esc(d.file)}</strong>${res.fatal?'':checkSummary(res.checks)}</div>
+            ${!res.fatal&&proj.kind==='laser'?thumb({kind:'laser',art:res.art,mat:d.mat},'thumb big'):''}
+            ${!res.fatal&&proj.kind==='print'?`<canvas class="thumb big" data-mesh="draft" aria-label="3D model preview"></canvas>`:''}
+            ${checkList(res.checks)}
+            ${indOk?'':`<div class="comment">You haven't had your ${proj.kind==='print'?'3D printer':'laser'} safety induction yet. You can still send this, and your teacher will see it.</div>`}
+            <div class="row">
+              <button type="button" class="btn primary" data-act="submit" ${fails||res.fatal?'disabled':''}>Send to Mr Okafor</button>
+              ${fails?`<span class="small" style="color:var(--bad)">Fix the ${plural(fails,'problem')} marked ✕, then choose the file again.</span>`:'<span class="small muted">Warnings are fine to send; your teacher will decide.</span>'}
+            </div>
+          </div>`:''}
+      </div>
+    </section>
+    <section class="panel" aria-labelledby="mine-h">
+      <div class="panel-h"><h2 id="mine-h">My jobs</h2><span class="muted small">${esc(p.name)}</span></div>
+      <div class="stack">${mine.length?mine.map(pupilJob).join(''):`<div class="empty">Nothing sent yet. Your jobs and where they've got to will show here.</div>`}</div>
+    </section>
+  </div>`;
+}
+function pupilJob(j){
+  return `<article class="job">${thumb(j)}<div class="job-body">
+    <div class="row"><span class="job-title">${esc(PROJ[j.project].name)}</span>${statusChip(j)}</div>
+    <div class="meta">${esc(j.file)} · ${esc(matLabel(j))} · ${j.qty} ${plural(j.qty,'copy','copies')} · sent ${esc(fmtWhen(j.submitted))}</div>
+    ${steps(j)}
+    ${j.status==='returned'?`<div class="comment"><strong>Mr Okafor:</strong> ${esc(j.comment)}</div><div><button type="button" class="btn sm" data-act="fix" data-id="${j.id}">Fix and send again</button></div>`:''}
+    ${j.status==='cut'||j.status==='printed'?`<div class="small" style="color:var(--ok)">Pick it up from the D&amp;T prep room.</div>`:''}
+  </div></article>`;
+}
+function clearDraftFile(){const d=state.draft;delete d.result;delete d.file;delete d.text;delete d.mesh}
+function loadDraftSVG(text,name){const d=state.draft;d.text=text;d.file=name;d.result=analyseSVG(text,d.mat);render()}
+function loadDraftSTL(buf,name){const d=state.draft;d.file=name;const t=readSTL(buf);d.mesh=t;d.result=analyseSTL(t);render()}
+function handleFile(f){
+  if(!f)return;const kind=PROJ[state.draft.project].kind;
+  if(kind==='laser'){if(!/\.svg$/i.test(f.name)){toast('Choose an .svg file for laser jobs.');return}f.text().then(t=>loadDraftSVG(t,f.name))}
+  else{if(!/\.stl$/i.test(f.name)){toast('Choose an .stl file for 3D printing.');return}f.arrayBuffer().then(b=>loadDraftSTL(b,f.name))}
+}
+function submitDraft(){
+  const d=state.draft,p=PUP[state.pupil],proj=PROJ[d.project];
+  if(!d.result||d.result.fatal)return;
+  const base={pupil:p.id,project:d.project,kind:proj.kind,qty:Math.max(1,Math.min(30,+d.qty||1)),file:d.file,status:'submitted',submitted:new Date(),checks:d.result.checks,cutCount:0};
+  if(proj.kind==='laser')Object.assign(base,{mat:d.mat,svg:d.text,est:d.result.est,art:d.result.art});
+  else Object.assign(base,{mat:'pla',mesh:d.mesh,stl:d.result.stl});
+  if(state.returning){const j=state.jobs.find(x=>x.id===state.returning);Object.assign(j,base);delete j.comment;state.returning=null}
+  else state.jobs.push({id:'j'+Date.now(),...base});
+  clearDraftFile();d.qty=1;
+  toast('Sent. Mr Okafor will check it before it goes in the queue.');render();
+}
+
+/* ---------- teacher ---------- */
+const QUICK=['Move the keyring hole further from the edge.','Too big for the material, so shrink it a little.','Check your line colours: red cuts, blue scores.','Join up the open cut line.','Looks good, but make one copy first to test it.'];
+function renderTeacher(){
+  const pending=state.jobs.filter(j=>j.status==='submitted').sort((a,b)=>a.submitted-b.submitted);
+  const tabs=[['approvals','Approvals',pending.length],['progress','Class progress'],['evidence','Coursework evidence',null,true]];
+  let body='';
+  if(state.teacherTab==='approvals'){
+    const shown=pending.filter(j=>state.classFilter==='all'||PUP[j.pupil].cls===state.classFilter);
+    body=`<div class="panel-h"><h2>Waiting for your approval</h2>
+      <div class="field" style="flex-direction:row;align-items:center;gap:8px"><label for="f-cls">Class</label><select id="f-cls" data-chg="classFilter"><option value="all">All classes</option>${Object.entries(CLASSES).map(([k,v])=>`<option value="${k}" ${state.classFilter===k?'selected':''}>${esc(v)}</option>`).join('')}</select></div></div>
+      <div class="stack">${shown.length?shown.map(teacherCard).join(''):`<div class="empty">Nothing waiting. New jobs from your classes appear here.</div>`}</div>`;
+  }
+  if(state.teacherTab==='progress') body=renderProgress();
+  if(state.teacherTab==='evidence') body=renderEvidence();
+  return tabBar(tabs,'teacherTab')+body;
+}
+function teacherCard(j){
+  const p=PUP[j.pupil];const open=state.openReturn===j.id;
+  return `<article class="job">${thumb(j)}<div class="job-body">
+    <div class="row"><span class="job-title">${esc(p.name)}</span><span class="muted small">${esc(CLASSES[p.cls])}</span>${checkSummary(j.checks)}${inducted(j)?'':chip(j.kind==='print'?'No 3D printer induction':'No laser induction','warn')}</div>
+    <div class="meta">${esc(PROJ[j.project].name)} · ${esc(j.file)} · ${esc(matLabel(j))} · ${j.qty} ${plural(j.qty,'copy','copies')} · sent ${esc(fmtWhen(j.submitted))}</div>
+    <details><summary class="small">See the checks</summary><div style="margin-top:8px">${checkList(j.checks)}</div></details>
+    ${open?`<div class="stack" style="gap:8px">
+        <label class="small muted" for="ret-${j.id}">What should ${esc(p.name.split(' ')[0])} change?</label>
+        <textarea id="ret-${j.id}" rows="2" style="width:100%">${esc(state.returnText||'')}</textarea>
+        <div class="row">${QUICK.map((q,i)=>`<button type="button" class="cell-btn" data-act="quick" data-i="${i}" data-id="${j.id}">${esc(q)}</button>`).join('')}</div>
+        <div class="row"><button type="button" class="btn primary sm" data-act="return" data-id="${j.id}">Send back</button><button type="button" class="btn sm" data-act="cancelReturn">Cancel</button></div>
+      </div>`
+      :`<div class="row"><button type="button" class="btn primary sm" data-act="approve" data-id="${j.id}">Approve</button><button type="button" class="btn sm" data-act="openReturn" data-id="${j.id}">Send back with a comment</button></div>`}
+  </div></article>`;
+}
+function renderProgress(){
+  const proj=PROJ[state.progressProject];
+  const pupils=PUPILS.filter(p=>p.cls===proj.cls);
+  const rows=pupils.map(p=>{
+    const js=state.jobs.filter(j=>j.pupil===p.id&&j.project===proj.id).sort((a,b)=>b.submitted-a.submitted);const j=js[0];
+    return {p,j};
+  });
+  const missing=rows.filter(r=>!r.j).length;
+  return `<div class="panel">
+    <div class="panel-h"><h2>Class progress</h2>
+      <div class="field" style="flex-direction:row;align-items:center;gap:8px"><label for="f-pp">Project</label><select id="f-pp" data-chg="progressProject">${PROJECTS.map(x=>`<option value="${x.id}" ${x.id===proj.id?'selected':''}>${esc(CLASSES[x.cls].split(' · ')[1])}: ${esc(x.name)}</option>`).join('')}</select></div></div>
+    <p class="muted small" style="margin-bottom:10px">Due ${esc(fmtDate(daysAhead(proj.due)))}. ${missing?`<strong style="color:var(--warn)">${missing} ${plural(missing,'pupil hasn\'t','pupils haven\'t')} sent anything yet.</strong>`:'Everyone has sent something.'}</p>
+    <div class="tbl-wrap"><table><thead><tr><th>Pupil</th><th>Latest job</th><th>Sent</th><th>Checks</th><th></th></tr></thead><tbody>
+    ${rows.map(({p,j})=>`<tr><td>${esc(p.name)}</td><td>${j?statusChip(j):chip('Not sent yet','warn')}</td><td class="small">${j?esc(fmtWhen(j.submitted)):''}</td><td>${j?checkSummary(j.checks):''}</td>
+      <td>${j?'':`<button type="button" class="btn sm" data-act="nudge" data-name="${esc(p.name)}">Send a reminder</button>`}</td></tr>`).join('')}
+    </tbody></table></div></div>`;
+}
+function previewNote(key,q){
+  const f=state.feedback[key];
+  return `<div class="preview-note"><span><strong>Preview.</strong> This shows the idea; it isn't finished.</span><span class="q">${esc(q)}</span>
+    <span class="row">${['Yes','Maybe','Not really'].map(a=>`<button type="button" class="btn sm" data-act="fb" data-k="${key}" data-a="${a}" aria-pressed="${f===a}" ${f===a?'style="border-color:var(--info);font-weight:600"':''}>${a}</button>`).join('')}</span>${f?`<span>Noted: ${esc(f)}</span>`:''}</div>`;
+}
+function renderEvidence(){
+  const p=PUP[state.evidencePupil];
+  const js=state.jobs.filter(j=>j.pupil===p.id).sort((a,b)=>a.submitted-b.submitted);
+  return previewNote('evidence','Would a dated record of making help with coursework portfolios?')+`<div class="panel">
+    <div class="panel-h"><h2>Record of making</h2>
+      <div class="field" style="flex-direction:row;align-items:center;gap:8px"><label for="f-ev">Pupil</label><select id="f-ev" data-chg="evidencePupil">${PUPILS.filter(x=>x.cls==='11T1').map(x=>`<option value="${x.id}" ${x.id===p.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div></div>
+    <p class="muted small" style="margin-bottom:12px">Every file a pupil sends, the checks it passed, comments and dates, collected automatically. The full version adds photos of the finished part and exports a page for the NEA portfolio.</p>
+    <div class="stack">${js.length?js.map(j=>`<article class="job">${thumb(j)}<div class="job-body"><div class="row"><span class="job-title">${esc(PROJ[j.project].name)}</span>${statusChip(j)}</div>
+      <div class="meta">${esc(j.file)} · ${esc(matLabel(j))}</div>
+      <div class="small">Sent ${esc(fmtWhen(j.submitted))}${j.approvedAt?` · approved ${esc(fmtWhen(j.approvedAt))}`:''}${j.cutAt?` · cut ${esc(fmtWhen(j.cutAt))}`:''}${j.printedAt?` · printed ${esc(fmtWhen(j.printedAt))}`:''}</div>
+      <button type="button" class="btn sm" disabled title="Coming in the full version">Add photo of the finished part</button></div></article>`).join(''):`<div class="empty">No jobs yet.</div>`}</div></div>`;
+}
+
+/* ---------- technician ---------- */
+function renderTech(){
+  const pending=state.jobs.filter(j=>j.status==='submitted').length;
+  const readyLaser=state.jobs.filter(j=>j.kind==='laser'&&j.status==='approved');
+  const lowStock=Object.keys(MATERIALS).filter(k=>state.stock[k]<=state.reorder[k]).length+(state.pla<1000?1:0);
+  const tabs=[['queue','Queue',readyLaser.length+state.jobs.filter(j=>j.kind==='print'&&j.status==='approved').length],['materials','Materials',lowStock||null],['safety','Safety register'],['maintenance','Maintenance',null,true],['budgets','Budgets',null,true]];
+  let body='';
+  if(state.techTab==='queue')body=renderQueue(pending);
+  if(state.techTab==='materials')body=renderMaterials();
+  if(state.techTab==='safety')body=renderSafety();
+  if(state.techTab==='maintenance')body=renderMaintenance();
+  if(state.techTab==='budgets')body=renderBudgets();
+  return tabBar(tabs,'techTab')+body;
+}
+function tabBar(tabs,key){
+  return `<div class="tabs" role="tablist">${tabs.map(([id,l,c,pv])=>`<button type="button" role="tab" id="tab-${id}" aria-selected="${state[key]===id}" data-act="tab" data-key="${key}" data-tab="${id}">${esc(l)}${c?`<span class="count">${c}</span>`:''}${pv?'<span class="pv">preview</span>':''}</button>`).join('')}</div>`;
+}
+function renderQueue(pending){
+  const laser=state.jobs.filter(j=>j.kind==='laser'&&j.status==='approved');
+  const prints=state.jobs.filter(j=>j.kind==='print');
+  const ready=state.jobs.filter(j=>j.status==='cut'||j.status==='printed');
+  const parts=laser.reduce((a,j)=>a+j.qty-(j.cutCount||0),0);
+  const groups=Object.keys(MATERIALS).map(k=>({k,jobs:laser.filter(j=>j.mat===k)})).filter(g=>g.jobs.length);
+  const nest=state.nest;
+  return `
+  <div class="strip">
+    <div class="stat"><b>${pending}</b><span>waiting for teachers</span></div>
+    <div class="stat"><b>${parts}</b><span>laser parts ready to cut</span></div>
+    <div class="stat"><b>${prints.filter(j=>j.status==='approved').length}</b><span>3D prints waiting</span></div>
+    <div class="stat"><b>${ready.length}</b><span>ready to collect</span></div>
+  </div>
+  <section class="panel" aria-labelledby="lq">
+    <div class="panel-h"><h2 id="lq">Laser cutter <span class="muted small" style="font-family:var(--f-body);font-weight:400">600 × 400 mm bed</span></h2>
+      <div class="legend"><span><i style="border-color:#ff0000"></i>cut</span><span><i style="border-color:#0000ff"></i>score</span><span><i style="border-color:var(--ink)"></i>engrave</span><span>${GAP} mm between parts</span></div></div>
+    ${groups.length?`<div class="cards">${groups.map(g=>{const m=MATERIALS[g.k];const n=g.jobs.reduce((a,j)=>a+j.qty-(j.cutCount||0),0);const t=g.jobs.reduce((a,j)=>a+j.est*(j.qty-(j.cutCount||0)),0);
+      const offs=state.offcuts.filter(o=>o.mat===g.k).length;
+      return `<div class="matcard"><div class="row"><span class="swatch" style="background:${m.colour}"></span><strong>${m.t} mm ${esc(m.name.toLowerCase())}</strong></div>
+        <div class="small muted">${g.jobs.length} ${plural(g.jobs.length,'job')} · ${n} ${plural(n,'part')} · about ${fmtDur(t)} · ${offs} ${plural(offs,'offcut')} in stock</div>
+        <div class="row">${g.jobs.map(j=>chip(`${PUP[j.pupil].name.split(' ')[0]} ×${j.qty-(j.cutCount||0)}`,j.checks.some(c=>c.level==='warn')?'warn':'plain')).join('')}</div>
+        <div><button type="button" class="btn ${nest&&nest.mat===g.k?'':'primary'} sm" data-act="nest" data-mat="${g.k}">${nest&&nest.mat===g.k?'Nest again':'Nest on sheets'}</button></div></div>`}).join('')}</div>`
+      :`<div class="empty">No approved laser jobs. When a teacher approves one, it lands here grouped by material.</div>`}
+    ${nest?renderNest(nest):''}
+  </section>
+  <section class="panel" style="margin-top:16px" aria-labelledby="pq">
+    <div class="panel-h"><h2 id="pq">3D printers</h2><span class="small muted">PLA left: <span class="num">${Math.round(state.pla)} g</span></span></div>
+    <div class="cards" style="margin-bottom:12px">${PRINTERS.map(pr=>{const j=prints.find(x=>x.status==='printing'&&x.printer===pr.id);
+      return `<div class="printer">${j?thumb(j):'<div class="thumb" style="display:grid;place-items:center;color:var(--muted);font-size:13px">Idle</div>'}<div class="job-body"><strong>${esc(pr.name)}</strong>
+        ${j?`<div class="small">${esc(PUP[j.pupil].name)} · ${esc(j.file)}</div><div class="small muted">About ${fmtDur(j.stl.hours*3600)}, ${Math.round(j.stl.grams)} g · started ${esc(fmtWhen(j.startedAt))}</div><div><button type="button" class="btn sm primary" data-act="printed" data-id="${j.id}">Print finished</button></div>`
+        :'<div class="small muted">Ready for the next job.</div>'}</div></div>`}).join('')}</div>
+    ${prints.filter(j=>j.status==='approved').length?`<div class="stack">${prints.filter(j=>j.status==='approved').map(j=>{const free=PRINTERS.filter(pr=>!prints.some(x=>x.status==='printing'&&x.printer===pr.id));
+      return `<article class="job">${thumb(j)}<div class="job-body"><div class="row"><span class="job-title">${esc(PUP[j.pupil].name)}</span>${checkSummary(j.checks)}</div>
+        <div class="meta">${esc(PROJ[j.project].name)} · ${esc(j.file)} · ${j.stl.dims.map(mm).join(' × ')} mm · about ${fmtDur(j.stl.hours*3600)}</div>
+        <div class="row">${free.length?free.map(pr=>`<button type="button" class="btn sm" data-act="startPrint" data-id="${j.id}" data-pr="${pr.id}">Start on ${esc(pr.name.split('· ')[1])}</button>`).join(''):'<span class="small muted">Both printers busy</span>'}</div></div></article>`}).join('')}</div>`
+      :`<div class="empty">No approved prints waiting.</div>`}
+  </section>
+  <section class="panel" style="margin-top:16px" aria-labelledby="rc">
+    <div class="panel-h"><h2 id="rc">Ready to collect</h2></div>
+    ${ready.length?`<div class="tbl-wrap"><table><thead><tr><th>Pupil</th><th>Job</th><th>Made</th><th></th></tr></thead><tbody>${ready.map(j=>`<tr><td>${esc(PUP[j.pupil].name)}</td><td>${esc(PROJ[j.project].name)} <span class="muted small">×${j.qty}</span></td><td class="small">${esc(fmtWhen(j.cutAt||j.printedAt))}</td><td><button type="button" class="btn sm" data-act="collect" data-id="${j.id}">Collected</button></td></tr>`).join('')}</tbody></table></div>`:`<div class="empty">Nothing waiting to be picked up.</div>`}
+  </section>`;
+}
+function renderNest(nest){
+  const m=MATERIALS[nest.mat];
+  if(!nest.sheets.length) return `<div class="empty" style="margin-top:14px">Nothing left to nest in ${esc(m.name.toLowerCase())}.</div>`;
+  return `<div class="stack" style="margin-top:16px">
+    <div class="row"><h3>Layout for ${m.t} mm ${esc(m.name.toLowerCase())}</h3><span class="small muted">${nest.sheets.length} ${plural(nest.sheets.length,'sheet')}. Offcuts are used first, then full sheets.</span></div>
+    ${nest.short?`<div class="comment">Not enough ${esc(m.name.toLowerCase())} in stock: ${nest.left} ${plural(nest.left,'part')} still need a sheet. Order more from the Materials tab.</div>`:''}
+    ${nest.unfit?`<div class="comment">${nest.unfit} ${plural(nest.unfit,'part is','parts are')} too big for a full sheet.</div>`:''}
+    ${nest.sheets.map((sh,i)=>`<div class="sheet">
+      <div class="row" style="justify-content:space-between"><div class="row"><strong>Sheet ${i+1}</strong>${sh.src==='offcut'?chip(`Offcut ${sh.W} × ${sh.H} mm`,'info'):chip(`Full sheet ${sh.W} × ${sh.H} mm`,'plain')}${chip(`${Math.round(sh.util*100)}% used`,sh.util>0.45?'ok':'plain')}</div>
+        <span class="small muted">${sh.placed.length} ${plural(sh.placed.length,'part')} · about ${fmtDur(sh.est)}</span></div>
+      ${sheetSVG(sh,nest.mat)}
+      <div class="small muted">${[...new Set(sh.placed.map(p=>p.it.job))].map(j=>`${esc(PUP[j.pupil].name)} ×${sh.placed.filter(p=>p.it.job===j).length}`).join(' · ')}${sh.left?` · Leaves an offcut of ${sh.left.w} × ${sh.left.h} mm (dashed)`:''}</div>
+      <div class="row"><button type="button" class="btn sm" data-act="copySheet" data-i="${i}">Copy SVG for the laser software</button><button type="button" class="btn sm primary" data-act="cutSheet" data-i="${i}">Mark sheet as cut</button></div>
+      ${state.copyOpen===i?`<textarea class="copybox" readonly aria-label="Sheet SVG">${esc(sheetSVG(sh,nest.mat,true))}</textarea><p class="fineprint">In the full version this saves an .svg file to open in 2D Design, LightBurn or the laser's own software.</p>`:''}
+    </div>`).join('')}
+  </div>`;
+}
+function renderMaterials(){
+  const rows=Object.entries(MATERIALS).map(([k,m])=>{const offs=state.offcuts.filter(o=>o.mat===k);const low=state.stock[k]<=state.reorder[k];
+    return `<tr><td><div class="row" style="flex-wrap:nowrap"><span class="swatch" style="background:${m.colour}"></span>${m.t} mm ${esc(m.name.toLowerCase())}</div></td>
+      <td class="num">${m.w} × ${m.h}</td>
+      <td><div class="row" style="flex-wrap:nowrap"><button type="button" class="btn sm" data-act="stock" data-k="${k}" data-d="-1" aria-label="One fewer sheet">−</button><span class="num" style="min-width:2ch;text-align:center">${state.stock[k]}</span><button type="button" class="btn sm" data-act="stock" data-k="${k}" data-d="1" aria-label="One more sheet">+</button></div></td>
+      <td class="num">${state.reorder[k]}</td>
+      <td>${low?chip('Reorder','bad'):chip('OK','ok')}</td>
+      <td><div class="row">${offs.length?offs.map(o=>chip(`${o.w} × ${o.h}`,'plain')).join(''):'<span class="muted small">None</span>'}</div></td>
+      <td class="num">£${m.cost.toFixed(2)}</td></tr>`}).join('');
+  const order=Object.entries(MATERIALS).filter(([k])=>state.stock[k]<=state.reorder[k]);
+  const maxCost=Math.max(...Object.values(state.usage).map(u=>u.cost),1);
+  return `<section class="panel"><div class="panel-h"><h2>Sheet stock</h2><span class="small muted">Offcuts are saved automatically when a sheet is cut.</span></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Material</th><th>Sheet mm</th><th>Sheets</th><th>Reorder at</th><th></th><th>Offcuts (mm)</th><th>Per sheet</th></tr></thead><tbody>${rows}
+    <tr><td>PLA filament</td><td class="num">1 kg spools</td><td class="num">${Math.round(state.pla)} g</td><td class="num">1000 g</td><td>${state.pla<1000?chip('Reorder','bad'):chip('OK','ok')}</td><td></td><td class="num">£18.00</td></tr></tbody></table></div></section>
+  <div class="grid2" style="margin-top:16px">
+    <section class="panel"><div class="panel-h"><h2>To order</h2></div>${order.length||state.pla<1000?`<ul style="margin:0;padding-left:18px">${order.map(([k,m])=>`<li>${m.t} mm ${esc(m.name.toLowerCase())}: ${state.reorder[k]*2-state.stock[k]} sheets (brings it to ${state.reorder[k]*2})</li>`).join('')}${state.pla<1000?'<li>PLA filament: 2 spools</li>':''}</ul>`:'<div class="empty">Nothing to order.</div>'}</section>
+    <section class="panel"><div class="panel-h"><h2>Material used this term</h2></div><div class="stack">${Object.entries(state.usage).map(([c,u])=>`<div><div class="row" style="justify-content:space-between"><span>${esc(CLASSES[c])}</span><span class="num small">${(u.area/1e6).toFixed(2)} m² · £${u.cost.toFixed(2)}</span></div><div class="bar"><i style="width:${u.cost/maxCost*100}%"></i></div></div>`).join('')}</div></section>
+  </div>`;
+}
+function renderSafety(){
+  const cls=state.safetyClass||'10T1';
+  const pupils=PUPILS.filter(p=>p.cls===cls);
+  const now=TODAY;
+  return `<section class="panel"><div class="panel-h"><h2>Pupil inductions</h2>
+      <div class="field" style="flex-direction:row;align-items:center;gap:8px"><label for="f-sc">Class</label><select id="f-sc" data-chg="safetyClass">${Object.entries(CLASSES).map(([k,v])=>`<option value="${k}" ${k===cls?'selected':''}>${esc(v)}</option>`).join('')}</select></div></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Pupil</th>${MACHINES.map(m=>`<th>${esc(m[1])}</th>`).join('')}</tr></thead><tbody>
+    ${pupils.map(p=>`<tr><td>${esc(p.name)}</td>${MACHINES.map(([k,l])=>{const d=state.ind[p.id][k];return `<td>${d?`<span class="small">${esc(fmtDate(d))}</span>`:`<button type="button" class="cell-btn" data-act="induct" data-p="${p.id}" data-m="${k}" aria-label="Record ${esc(l)} induction for ${esc(p.name)} today">Not yet · record today</button>`}</td>`}).join('')}</tr>`).join('')}
+    </tbody></table></div>
+    <p class="fineprint" style="margin-top:8px">Teachers see a warning when a pupil without an induction sends a job.</p></section>
+  <section class="panel" style="margin-top:16px"><div class="panel-h"><h2>Staff health and safety training</h2><span class="small muted">D&amp;T Association standards, refresher every 5 years</span></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Role</th><th>Accredited</th><th>Refresher due</th><th></th></tr></thead><tbody>
+    ${state.staff.map(s=>{const due=new Date(s.acc);due.setFullYear(due.getFullYear()+5);const days=Math.round((due-now)/864e5);
+      return `<tr><td>${esc(s.name)}</td><td>${esc(s.role)}</td><td class="small">${esc(fmtDate(s.acc))}</td><td class="small">${esc(fmtDate(due))}</td><td>${days<0?chip(`Overdue by ${Math.round(-days/30)} months`,'bad'):days<180?chip(`Due in ${Math.max(1,Math.round(days/30))} months`,'warn'):chip('In date','ok')}</td></tr>`}).join('')}
+    </tbody></table></div></section>`;
+}
+function renderMaintenance(){
+  const lev=new Date(TODAY);lev.setDate(lev.getDate()+23);
+  const cards=[
+    {m:'Laser cutter',items:[['Tube hours','1,240 of about 2,000','ok'],['Lens and mirrors cleaned','9 days ago (weekly)','warn'],['Extraction filter','Changed 3 months ago','ok'],['LEV thorough examination','Due '+fmtDate(lev)+' (every 14 months)','warn']]},
+    {m:'Prusa MK3 · A',items:[['Print hours','612','ok'],['Nozzle','Replaced 2 months ago','ok'],['Bed sheet','Cleaned today','ok']]},
+    {m:'Prusa MK3 · B',items:[['Print hours','588','ok'],['Belt tension','Not checked this term','warn']]},
+    {m:'Bandsaw',items:[['Blade','Changed 5 weeks ago','ok'],['Guard check','Weekly, done Monday','ok']]}
+  ];
+  return previewNote('maintenance','Would reminders like these, worked out from machine hours, be useful?')+`<div class="cards">${cards.map(c=>`<section class="panel"><h3 style="margin-bottom:10px">${esc(c.m)}</h3><div class="stack" style="gap:8px">${c.items.map(([a,b,s])=>`<div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:12px"><span>${esc(a)}</span><span class="row" style="flex-wrap:nowrap;gap:6px"><span class="small muted" style="text-align:right">${esc(b)}</span><span class="chip ${s}" aria-label="${s==='ok'?'OK':'Needs attention'}">${s==='ok'?'✓':'!'}</span></span></div>`).join('')}</div></section>`).join('')}</div>`;
+}
+function renderBudgets(){
+  return previewNote('budgets','Do you need to track material spend against a budget per class?')+`<section class="panel"><div class="panel-h"><h2>Material budgets this term</h2><span class="small muted">Worked out from what each class's jobs used</span></div>
+    <div class="stack">${Object.entries(state.usage).map(([c,u])=>{const b=state.budget[c];const pc=u.cost/b;return `<div><div class="row" style="justify-content:space-between"><strong>${esc(CLASSES[c])}</strong><span class="num">£${u.cost.toFixed(2)} of £${b}</span></div><div class="bar" style="height:12px"><i class="${pc>0.9?'over':''}" style="width:${Math.min(100,pc*100)}%"></i></div></div>`}).join('')}</div></section>`;
+}
+
+/* ---------- actions ---------- */
+function stamp(){return new Date()}
+const ACT={
+  tab:b=>{state[b.dataset.key]=b.dataset.tab;state.copyOpen=null;render()},
+  sample:b=>{const s=b.dataset.s;
+    if(s==='good')loadDraftSVG(keyring(56,26,'star'),'finn-keyring.svg');
+    if(s==='bad')loadDraftSVG(problemFile(),'finn keyring FINAL(2).svg');
+    if(s==='clip')loadDraftSTL(makeBinarySTL(MESH.clip()),'cable-clip.stl');
+    if(s==='big')loadDraftSTL(makeBinarySTL(MESH.big()),'desk-tidy-full-size.stl');},
+  submit:()=>submitDraft(),
+  fix:b=>{const j=state.jobs.find(x=>x.id===b.dataset.id);state.returning=j.id;state.draft.project=j.project;state.draft.mat=j.kind==='laser'?j.mat:'pla';state.draft.qty=j.qty;clearDraftFile();render();$('#send').scrollIntoView({behavior:'smooth',block:'start'})},
+  approve:b=>{const j=state.jobs.find(x=>x.id===b.dataset.id);j.status='approved';j.approvedAt=stamp();state.nest=null;toast(`Approved. ${PUP[j.pupil].name.split(' ')[0]}'s job is in the technician's queue.`);render()},
+  openReturn:b=>{state.openReturn=b.dataset.id;state.returnText='';render();const t=$('#ret-'+b.dataset.id);t&&t.focus()},
+  cancelReturn:()=>{state.openReturn=null;render()},
+  quick:b=>{const t=$('#ret-'+b.dataset.id);t.value=(t.value?t.value.trim()+' ':'')+QUICK[+b.dataset.i];state.returnText=t.value;t.focus()},
+  return:b=>{const t=$('#ret-'+b.dataset.id);const txt=t.value.trim();if(!txt){toast('Write a short comment so the pupil knows what to change.');t.focus();return}
+    const j=state.jobs.find(x=>x.id===b.dataset.id);j.status='returned';j.comment=txt;j.returnedAt=stamp();state.openReturn=null;toast(`Sent back to ${PUP[j.pupil].name.split(' ')[0]}.`);render()},
+  nudge:b=>toast(`Reminder shown to ${b.dataset.name} (in this demo nothing is actually sent).`),
+  nest:b=>{state.nest=nestBatch(b.dataset.mat);state.copyOpen=null;render()},
+  copySheet:b=>{const i=+b.dataset.i;const sh=state.nest.sheets[i];const txt=sheetSVG(sh,state.nest.mat,true);state.copyOpen=i;
+    const done=()=>{toast('SVG copied.');render()};
+    try{navigator.clipboard.writeText(txt).then(done,()=>render())}catch(e){render()}},
+  cutSheet:b=>{
+    const i=+b.dataset.i;const nest=state.nest;const sh=nest.sheets[i];const mat=MATERIALS[nest.mat];
+    if(sh.src==='offcut')state.offcuts=state.offcuts.filter(o=>o.id!==sh.off);else state.stock[nest.mat]=Math.max(0,state.stock[nest.mat]-1);
+    if(sh.left)state.offcuts.push({id:'o'+Date.now()+i,mat:nest.mat,w:sh.left.w,h:sh.left.h});
+    const costMm=mat.cost/(mat.w*mat.h);
+    sh.placed.forEach(p=>{const j=p.it.job;j.cutCount=(j.cutCount||0)+1;const c=PUP[j.pupil].cls;state.usage[c].area+=p.it.w*p.it.h;state.usage[c].cost+=p.it.w*p.it.h*costMm;
+      if(j.cutCount>=j.qty){j.status='cut';j.cutAt=stamp()}});
+    nest.sheets.splice(i,1);state.copyOpen=null;
+    if(!nest.sheets.length)state.nest=null;
+    toast(sh.left?`Marked as cut. Saved an offcut of ${sh.left.w} × ${sh.left.h} mm.`:'Marked as cut. Pupils can see their parts are ready.');render()},
+  startPrint:b=>{const j=state.jobs.find(x=>x.id===b.dataset.id);j.status='printing';j.printer=b.dataset.pr;j.startedAt=stamp();render()},
+  printed:b=>{const j=state.jobs.find(x=>x.id===b.dataset.id);j.status='printed';j.printedAt=stamp();state.pla=Math.max(0,state.pla-j.stl.grams);render()},
+  collect:b=>{const j=state.jobs.find(x=>x.id===b.dataset.id);j.status='collected';render()},
+  stock:b=>{state.stock[b.dataset.k]=Math.max(0,state.stock[b.dataset.k]+ +b.dataset.d);render()},
+  induct:b=>{state.ind[b.dataset.p][b.dataset.m]=stamp();render()},
+  fb:b=>{state.feedback[b.dataset.k]=b.dataset.a;render()}
+};
+const CHG={
+  project:v=>{state.draft.project=v;const p=PROJ[v];state.draft.mat=p.mat||'pla';clearDraftFile()},
+  mat:v=>{state.draft.mat=v;if(state.draft.text)state.draft.result=analyseSVG(state.draft.text,v)},
+  qty:v=>{state.draft.qty=Math.max(1,Math.min(30,+v||1))},
+  classFilter:v=>{state.classFilter=v},progressProject:v=>{state.progressProject=v},evidencePupil:v=>{state.evidencePupil=v},safetyClass:v=>{state.safetyClass=v},
+  pupil:v=>{state.pupil=v;state.returning=null;clearDraftFile()}
+};
+
+/* ---------- render ---------- */
+function render(){
+  document.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.role===state.role));
+  const who=$('#who');
+  if(state.role==='pupil') who.innerHTML=`<label for="f-pupil" class="muted">Signed in as</label><select id="f-pupil" data-chg="pupil">${Object.entries(CLASSES).map(([c,l])=>`<optgroup label="${esc(l)}">${PUPILS.filter(p=>p.cls===c).map(p=>`<option value="${p.id}" ${p.id===state.pupil?'selected':''}>${esc(p.name)}</option>`).join('')}</optgroup>`).join('')}</select>`;
+  else who.innerHTML=`<span class="muted">Signed in as</span> <strong>${state.role==='teacher'?'Mr Okafor':'Ms Price'}</strong>`;
+  const main=$('#main');
+  main.innerHTML=state.role==='pupil'?renderPupil():state.role==='teacher'?renderTeacher():renderTech();
+  refreshMeshes();
+}
+document.addEventListener('click',e=>{
+  const r=e.target.closest('[data-role]');if(r){state.role=r.dataset.role;state.copyOpen=null;render();window.scrollTo({top:0});return}
+  const b=e.target.closest('[data-act]');if(b&&!b.disabled&&ACT[b.dataset.act]){e.preventDefault();ACT[b.dataset.act](b)}
+});
+document.addEventListener('change',e=>{
+  const el=e.target.closest('[data-chg]');if(!el)return;const k=el.dataset.chg;
+  if(k==='file'){handleFile(el.files[0]);el.value='';return}
+  if(CHG[k]){CHG[k](el.value);render()}
+});
+document.addEventListener('input',e=>{if(e.target.id&&e.target.id.startsWith('ret-'))state.returnText=e.target.value});
+document.addEventListener('dragover',e=>{const d=e.target.closest('#drop');if(d){e.preventDefault();d.classList.add('over')}});
+document.addEventListener('dragleave',e=>{const d=e.target.closest('#drop');if(d)d.classList.remove('over')});
+document.addEventListener('drop',e=>{const d=e.target.closest('#drop');if(!d)return;e.preventDefault();d.classList.remove('over');handleFile(e.dataTransfer.files[0])});
+$('#reset').addEventListener('click',()=>{state=seed();render();toast('Demo reset.')});
+window.addEventListener('resize',()=>refreshMeshes());
+state=seed();render();
+</script>
+</body>
+</html>
